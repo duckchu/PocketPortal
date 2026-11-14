@@ -1,0 +1,25 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["Neverland", "island", "Lost Boys"],
+      "content": "Neverland is a magical island where children never grow up, featuring Mermaid Lagoon, Skull Rock, pirate coves, and the underground hideout of the Lost Boys.",
+      "constant": false,
+      "order": 100
+    },
+    "1": {
+      "uid": 1,
+      "key": ["pixie dust", "fly", "Tinker Bell"],
+      "content": "With happy thoughts and a sprinkle of Tinker Bell's golden pixie dust, anyone can soar into the night sky toward the second star to the right.",
+      "constant": false,
+      "order": 90
+    },
+    "2": {
+      "uid": 2,
+      "key": ["Hook", "pirate", "crocodile"],
+      "content": "Captain Hook commands the Jolly Roger and endlessly hunts Peter Pan, while constantly fleeing the ticking crocodile that once swallowed his hand and a clock.",
+      "constant": false,
+      "order": 80
+    }
+  }
+}

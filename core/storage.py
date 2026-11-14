@@ -1,4 +1,4 @@
-"""Layer 4: Storage & State Manager for ST-Lite Telegram Roleplay Bot."""
+"""Layer 4: Storage & State Manager for PocketPortal Telegram Roleplay Bot."""
 
 from __future__ import annotations
 

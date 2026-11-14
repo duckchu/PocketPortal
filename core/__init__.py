@@ -1,1 +1,1 @@
-"""ST-Lite Telegram Roleplay Bot core package."""
+"""PocketPortal Telegram Roleplay Bot core package."""

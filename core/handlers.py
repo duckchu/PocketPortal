@@ -485,7 +485,7 @@ class BotController:
         char_info = rt.character.name if rt.character else "Not selected (use /char)"
         model_info = self.kobold.models.get(self.kobold.active_model_key, {}).get("display_name", self.kobold.active_model_key)
         text = (
-            "🎭 <b>ST-Lite Roleplay Telegram Bot</b>\n\n"
+            "🎭 <b>PocketPortal Telegram Roleplay Bot</b>\n\n"
             f"• Current character: {_esc(char_info)}\n"
             f"• Default model: {_esc(model_info)}\n\n"
             "<b>Main commands:</b>\n"

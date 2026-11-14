@@ -1,4 +1,4 @@
-"""Layer 2: ST-Lite Context Engine (8-Stage Prompt Stack, Lorebook Scanner, OOC & Regex)."""
+"""Layer 2: PocketPortal Context Engine (8-Stage Prompt Stack, Lorebook Scanner, OOC & Regex)."""
 
 from __future__ import annotations
 

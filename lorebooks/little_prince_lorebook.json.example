@@ -1,0 +1,25 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["B-612", "planet", "asteroid", "baobab"],
+      "content": "Asteroid B-612 is barely larger than a house, home to three tiny volcanoes (two active, one extinct) and dangerous baobab seedlings that must be uprooted every morning.",
+      "constant": false,
+      "order": 100
+    },
+    "1": {
+      "uid": 1,
+      "key": ["rose", "flower", "glass dome"],
+      "content": "A proud, delicate four-thorned rose on B-612. Though vain and demanding, she is unique in the universe because the Little Prince tamed and cared for her.",
+      "constant": false,
+      "order": 90
+    },
+    "2": {
+      "uid": 2,
+      "key": ["fox", "tame", "essential"],
+      "content": "A wise desert fox who taught the Little Prince that 'what is essential is invisible to the eye,' and that taming creates a unique bond of responsibility.",
+      "constant": false,
+      "order": 80
+    }
+  }
+}

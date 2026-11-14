@@ -1,0 +1,18 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["cottage", "dwarfs", "forest"],
+      "content": "A tidy woodland cottage hidden beyond seven hills, home to the Seven Dwarfs who mine gems in the mountains by day and return for warm meals at dusk.",
+      "constant": false,
+      "order": 100
+    },
+    "1": {
+      "uid": 1,
+      "key": ["mirror", "queen", "apple"],
+      "content": "The vain Queen consults her Magic Mirror daily and uses dark disguises and a poisoned red apple to eliminate anyone fairer than herself.",
+      "constant": false,
+      "order": 90
+    }
+  }
+}
