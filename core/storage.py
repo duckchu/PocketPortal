@@ -656,7 +656,7 @@ class StorageManager:
 
     def load_session(self, path: str | Path) -> SessionState:
         p = Path(path)
-        if not p.is_absolute():
+        if not p.is_absolute() and not p.exists():
             p = self.sessions_dir / p
         if not p.exists():
             raise FileNotFoundError(f"Session file not found: {p}")
