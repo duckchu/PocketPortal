@@ -1,0 +1,31 @@
+# Additional effect prompt library (example).
+
+[blush]
+blush, flushed cheeks, red ears,
+
+[rain]
+rain, wet hair, water droplets, overcast,
+
+[upperbody]
+upper body, cowboy shot, from waist up, chest and shoulders in frame,
+
+[lowerbody]
+lower body, from waist down, full legs visible, footwear,
+
+[fullbody]
+full body, entire body visible, standing straight, front view,
+
+[closeup]
+close-up, face focus, detailed face, detailed eyes,
+
+[from_above]
+from above, high angle, looking down,
+
+[from_below]
+from below, low angle, looking up,
+
+[pov]
+pov, first person view, viewer perspective,
+
+[wide]
+wide shot, scenery, environment focus,

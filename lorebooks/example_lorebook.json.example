@@ -1,0 +1,11 @@
+{
+  "entries": {
+    "0": {
+      "uid": 0,
+      "key": ["Grand Library"],
+      "content": "A vast archive of magical tomes and forgotten lore.",
+      "constant": false,
+      "order": 100
+    }
+  }
+}

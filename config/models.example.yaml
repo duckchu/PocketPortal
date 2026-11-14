@@ -1,0 +1,66 @@
+default_model: kobold-example
+models:
+  kobold-example:
+    backend: koboldcpp
+    display_name: '[Kobold] Example Local GGUF'
+    path: /path/to/models/example-model.gguf
+    vram_gb: 8.0
+    context_size: 65536
+    gpu_layers: 999
+    use_vulkan: false
+    flash_attention: true
+    extra_args: []
+    instruct_template: chatml
+    sampling:
+      temp: 0.9
+      min_p: 0.1
+      top_p: 1.0
+      top_k: 0
+      rep_pen: 1.04
+      rep_pen_range: 2048
+      max_length: 1024
+  ollama-example:
+    backend: ollama
+    ollama_model: example-model:latest
+    display_name: '[Ollama] Example Local Model'
+    vram_gb: 8.0
+    context_size: 65536
+    instruct_template: chatml
+    sampling:
+      temp: 0.9
+      min_p: 0.1
+      top_p: 1.0
+      top_k: 0
+      rep_pen: 1.04
+      rep_pen_range: 2048
+      max_length: 1024
+  mlx-example:
+    backend: mlx
+    mlx_model: mlx-community/example-model-4bit
+    display_name: '[MLX] Example Apple Silicon Model'
+    vram_gb: 6.0
+    context_size: 65536
+    instruct_template: chatml
+    sampling:
+      temp: 0.9
+      min_p: 0.1
+      top_p: 1.0
+      top_k: 0
+      rep_pen: 1.08
+      rep_pen_range: 2048
+      max_length: 1024
+  ollama-cloud-example:
+    backend: ollama_cloud
+    ollama_model: example-flash:cloud
+    display_name: '[Cloud] Example Flash Model'
+    vram_gb: 0
+    context_size: 65536
+    instruct_template: chatml_think
+    sampling:
+      temp: 0.9
+      min_p: 0.1
+      top_p: 1.0
+      top_k: 0
+      rep_pen: 1.04
+      rep_pen_range: 2048
+      max_length: 1024

@@ -1,0 +1,25 @@
+bot_token: YOUR_TELEGRAM_BOT_TOKEN_HERE
+allowed_user_ids:
+- 123456789
+# Local inference backends (defaults are fine for a stock install)
+koboldcpp_url: http://127.0.0.1:5001
+koboldcpp_bin: /path/to/bin/koboldcpp
+koboldcpp_port: 5001
+koboldcpp_startup_timeout: 120
+ollama_url: http://127.0.0.1:11434
+# Ollama Cloud: set ollama_api_key here or export OLLAMA_API_KEY
+# ollama_api_key: YOUR_OLLAMA_API_KEY
+# ollama_cloud_url: https://ollama.com
+mlx_port: 8080
+# Model key from config/models.yaml
+default_model: kobold-example
+# Preset key from config/system_presets.yaml
+active_preset: neutral_rp
+default_user_name: Traveler
+default_user_preset: ''
+default_user_persona: '{{user}} is a calm, observant adventurer exploring the world
+  alongside {{char}}.
+
+  '
+stream_interval_sec: 1.6
+idle_unload_seconds: 300

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Configs (keep *.example.yaml templates tracked)
+config/*.yaml
+config/*.yml
+config/*.json
+!config/*.example.yaml
+!config/*.example.yml
+
+# Character cards & Lorebooks (keep *.example and .gitkeep tracked)
+characters/*.json
+characters/*.yaml
+characters/*.yml
+lorebooks/*.json
+lorebooks/*.yaml
+lorebooks/*.yml
+
+# Dynamic runtime data
+sessions/*
+!sessions/.gitkeep
+exports/*
+!exports/.gitkeep
+logs/*
+!logs/.gitkeep
+*.tmp
+
+# Private illustration assets (kept locally, never committed)
+illust/prompts/*.txt
+!illust/prompts/*.txt.example
+!illust/prompts/*.example.txt
+illust/personas/*.yaml
+!illust/personas/*.example.yaml
+illust/personas/*.yml
+
+# Local persona/prompt overrides
+config/*.local.yaml
+i18n/*.local.json

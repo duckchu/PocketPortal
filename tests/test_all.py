@@ -1,0 +1,202 @@
+"""Self-contained unit tests for PocketPortal core modules."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
+import yaml
+
+from core.context_engine import ContextEngine
+from core.handlers import BotController
+from core.kobold_adapter import KoboldAdapter
+from core.storage import CharacterCard, LorebookEntry, StorageManager, Turn
+
+
+def _make_stack(tmp_workspace: Path):
+    for sub in ("config", "characters", "lorebooks", "sessions", "exports", "logs"):
+        (tmp_workspace / sub).mkdir(parents=True, exist_ok=True)
+
+    bot_cfg = {
+        "bot_token": "test-token",
+        "allowed_user_ids": [12345],
+        "default_user_name": "Player",
+        "koboldcpp_url": "http://127.0.0.1:5001",
+        "ollama_url": "http://127.0.0.1:11434",
+        "mlx_url": "http://127.0.0.1:8080",
+        "active_preset": "default",
+        "idle_unload_seconds": 300,
+    }
+    models_cfg = {
+        "default_model": "local-kobold",
+        "models": {
+            "local-kobold": {
+                "backend": "koboldcpp",
+                "display_name": "[Kobold] Test 8B",
+                "path": str(tmp_workspace / "test.gguf"),
+                "vram_gb": 5.0,
+                "context_size": 65536,
+                "instruct_template": "chatml_think",
+                "sampling": {"temp": 0.9, "max_length": 1024},
+            },
+            "local-ollama": {
+                "backend": "ollama",
+                "ollama_model": "test:8b",
+                "display_name": "[Ollama] Test 8B",
+                "vram_gb": 5.0,
+                "context_size": 65536,
+                "instruct_template": "chatml",
+                "sampling": {"temp": 0.9, "max_length": 1024},
+            },
+            "local-mlx": {
+                "backend": "mlx",
+                "mlx_model": "mlx-community/test-4bit",
+                "display_name": "[MLX] Test 8B (4bit)",
+                "vram_gb": 5.0,
+                "context_size": 65536,
+                "instruct_template": "chatml",
+                "sampling": {"temp": 0.9, "max_length": 1024},
+            },
+            "cloud-flash": {
+                "backend": "ollama_cloud",
+                "ollama_model": "deepseek-v4.1-flash:cloud",
+                "display_name": "[Cloud] DeepSeek v4.1 Flash",
+                "vram_gb": 0,
+                "context_size": 65536,
+                "instruct_template": "chatml_think",
+                "sampling": {"temp": 0.9, "max_length": 1024},
+            },
+        },
+    }
+    presets_cfg = {
+        "instruct_templates": {
+            "chatml": {
+                "bos_token": "",
+                "system_prefix": "<|im_start|>system\n",
+                "system_suffix": "<|im_end|>\n",
+                "user_prefix": "<|im_start|>user\n",
+                "user_suffix": "<|im_end|>\n",
+                "assistant_prefix": "<|im_start|>assistant\n",
+                "assistant_suffix": "<|im_end|>\n",
+                "assistant_prefill": "<|im_start|>assistant\n",
+                "stop_sequences": ["<|im_end|>"],
+            },
+            "chatml_think": {
+                "bos_token": "",
+                "system_prefix": "<|im_start|>system\n",
+                "system_suffix": "<|im_end|>\n",
+                "user_prefix": "<|im_start|>user\n",
+                "user_suffix": "<|im_end|>\n",
+                "assistant_prefix": "<|im_start|>assistant\n",
+                "assistant_suffix": "<|im_end|>\n",
+                "assistant_prefill": "<|im_start|>assistant\n<think>\n\n</think>\n",
+                "stop_sequences": ["<|im_end|>"],
+            },
+        },
+        "presets": {
+            "default": {
+                "system_prompt": "You are {{char}}, roleplaying with {{user}}.",
+                "post_history_instructions": "Stay in character.",
+                "terminal_instruction": "",
+                "jailbreak_prefill": "",
+            }
+        },
+        "regex_post_process": [],
+    }
+    (tmp_workspace / "config" / "bot_config.yaml").write_text(yaml.safe_dump(bot_cfg), encoding="utf-8")
+    (tmp_workspace / "config" / "models.yaml").write_text(yaml.safe_dump(models_cfg), encoding="utf-8")
+    (tmp_workspace / "config" / "system_presets.yaml").write_text(yaml.safe_dump(presets_cfg), encoding="utf-8")
+
+    storage = StorageManager(tmp_workspace)
+    kobold = KoboldAdapter(bot_config=bot_cfg, models_config=models_cfg, logs_dir=storage.logs_dir)
+    engine = ContextEngine(storage=storage, kobold=kobold, bot_config=bot_cfg, presets_config=presets_cfg)
+    return storage, kobold, engine, bot_cfg
+
+
+def test_storage_and_cli_args(tmp_path: Path) -> None:
+    storage, kobold, _, _ = _make_stack(tmp_path)
+    (tmp_path / "test.gguf").write_bytes(b"gguf")
+    args = kobold.build_cli_args("local-kobold")
+    assert "--contextsize" in args and "65536" in args
+    mlx_args = kobold.build_mlx_cli_args("local-mlx")
+    assert "mlx_lm" in mlx_args and "server" in mlx_args
+
+
+def test_inline_ooc_parsing(tmp_path: Path) -> None:
+    _, _, engine, _ = _make_stack(tmp_path)
+    dlg, ooc = engine.parse_user_input("Hello there! (OOC: make her smile)")
+    assert dlg == "Hello there!"
+    assert ooc == "make her smile"
+
+    dlg2, ooc2 = engine.parse_user_input("// speed up the scene")
+    assert dlg2 == ""
+    assert ooc2 == "speed up the scene"
+
+
+@pytest.mark.asyncio
+async def test_prompt_stack_and_story_arc(tmp_path: Path) -> None:
+    storage, kobold, engine, bot_cfg = _make_stack(tmp_path)
+    ctrl = BotController(storage, kobold, engine, bot_cfg)
+
+    card = CharacterCard(
+        name="Aria",
+        filename="aria.yaml",
+        description="An arcane scholar at the Grand Library.",
+        first_mes="\"{{user}}, look at this glowing manuscript!\"",
+        alternate_greetings=["\"Welcome back, {{user}}.\""],
+        character_book_entries=[
+            LorebookEntry(uid="l1", keys=["Starlight Vault"], content="A hidden chamber beneath the library.", position=0, depth=4),
+        ],
+    )
+    sess = storage.create_session(card, kobold.active_model_key, user_name="Player", include_first_mes=True, chat_id=11111)
+    assert sess.file_path.parent.name == "11111"
+
+    raw_json_arc = '<think>planning</think>\n' + '{"title": "Echoes of the Starlight Vault", "premise": "Uncovering an ancient cipher hidden inside the Grand Library.", "chapters": [{"name": "Chapter 1: Midnight Cipher", "goal": "Inspect the Starlight Vault entrance", "hooks": "glowing quill, secret door"}, {"name": "Chapter 2: Forgotten Archive", "goal": "Decode the memory crystal", "hooks": "crystal shard"}]}'
+    arc = BotController._parse_story_arc_output(raw_json_arc, "Aria")
+    assert arc["enabled"] is True
+    assert arc["title"] == "Echoes of the Starlight Vault"
+    assert len(arc["chapters"]) == 2
+
+    sess.story_arc = arc
+    storage.save_session(sess)
+    reloaded = storage.load_session(sess.file_path)
+    assert reloaded.story_arc["title"] == "Echoes of the Starlight Vault"
+
+    cp_path = storage.create_checkpoint(reloaded, custom_title="arc_cp")
+    cp_sess = storage.load_session(cp_path)
+    assert cp_sess.story_arc["chapters"][0]["goal"] == "Inspect the Starlight Vault entrance"
+
+    md_path = storage.export_story_markdown(reloaded, card, custom_title="arc_story")
+    assert "Echoes of the Starlight Vault" in md_path.read_text(encoding="utf-8")
+
+    assembled = await engine.build_prompt(reloaded, card, pending_user_text="Let us talk.")
+    assert "[Story Campaign Outline: Echoes of the Starlight Vault]" in assembled.prompt_text
+    assert "[Story Arc Guidance - Chapter 1: Midnight Cipher]" in assembled.prompt_text
+    assert "A hidden chamber beneath the library." in assembled.prompt_text
+
+    # Chat ID isolation
+    sess2 = storage.create_session(card, kobold.active_model_key, user_name="GroupUser", chat_id=-10022222)
+    assert len(storage.list_sessions(chat_id=11111)) == 2  # session + checkpoint
+    assert len(storage.list_sessions(chat_id=-10022222)) == 1
+    assert storage.get_latest_session_for_char("Aria", chat_id=-10022222).user_name == "GroupUser"
+
+
+def test_two_level_model_menu(tmp_path: Path) -> None:
+    storage, kobold, engine, bot_cfg = _make_stack(tmp_path)
+    ctrl = BotController(storage, kobold, engine, bot_cfg)
+    rt = ctrl.get_runtime(12345)
+
+    _, fw_markup = ctrl._build_model_framework_menu(rt, live_model=None)
+    fw_callbacks = [btn.callback_data for row in fw_markup.inline_keyboard for btn in row]
+    assert "mdl_fw:koboldcpp" in fw_callbacks
+    assert "mdl_fw:ollama" in fw_callbacks
+    assert "mdl_fw:mlx" in fw_callbacks
+    assert "mdl_fw:ollama_cloud" in fw_callbacks
+
+    _, oc_markup = ctrl._build_model_list_menu(rt, "ollama_cloud", live_model=None)
+    oc_labels = [btn.text for row in oc_markup.inline_keyboard for btn in row]
+    assert any("Cloud" in lbl for lbl in oc_labels)

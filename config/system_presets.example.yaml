@@ -1,0 +1,206 @@
+presets:
+  immersive:
+    name: Roleplay - Immersive
+    system_prompt: "You are {{char}}. Write in third person limited, staying strictly
+      inside {{char}}'s point of view for narration while portraying only {{char}}.
+
+      1. [Narration]: Plain prose, no brackets or asterisks. Each reply is 1-2 paragraphs
+      (100-220 words) and ends at a natural pause that invites {{user}} to respond.
+
+      2. [Agency]: Never speak, decide, or act for {{user}}. Describe your own actions
+      and reactions only, and leave space for {{user}} to act.
+
+      3. [Character]: Stay 100% in character at all times. Honour the card personality,
+      background, speech habits, and knowledge limits.
+
+      4. [Format]: Inner thoughts in parentheses (like *...*) only when the card uses it,
+      dialogue in double quotes, actions in plain narration.
+
+      "
+    jailbreak_prefill: ''
+    post_history_instructions: '[Style reminder: 1. Stay fully as {{char}} with 1-2 paragraph
+      replies. 2. Never act or speak for {{user}}. 3. Keep 100% in character. 4. Use plain
+      narration, quotes for dialogue, and parentheses for inner thoughts.]'
+    terminal_instruction: '[System Note: Continue as "{{char}}" with natural pacing
+      (1-2 paragraphs, 80-180 words). Never write lines or actions for "{{user}}".
+      Stay 100% in character, keeping tone and knowledge consistent.]'
+  neutral_rp:
+    name: Neutral Roleplay
+    system_prompt: 'Enter roleplay mode. Stay strictly in character as {{char}}, never
+      speak or act on behalf of {{user}}, and follow the narrative pacing naturally.
+
+      '
+    jailbreak_prefill: ''
+    post_history_instructions: ''
+instruct_templates:
+  chatml:
+    name: ChatML
+    system_prefix: '<|im_start|>system
+
+      '
+    system_suffix: '<|im_end|>
+
+      '
+    user_prefix: '<|im_start|>user
+
+      '
+    user_suffix: '<|im_end|>
+
+      '
+    assistant_prefix: '<|im_start|>assistant
+
+      '
+    assistant_suffix: '<|im_end|>
+
+      '
+    assistant_prefill: '<|im_start|>assistant
+
+      '
+    stop_sequences:
+    - <|im_end|>
+    - <|im_start|>user
+    - <|im_start|>system
+  chatml_think:
+    name: ChatML (Bypass Think)
+    system_prefix: '<|im_start|>system
+
+      '
+    system_suffix: '<|im_end|>
+
+      '
+    user_prefix: '<|im_start|>user
+
+      '
+    user_suffix: '<|im_end|>
+
+      '
+    assistant_prefix: '<|im_start|>assistant
+
+      '
+    assistant_suffix: '<|im_end|>
+
+      '
+    assistant_prefill: '<|im_start|>assistant
+
+      <think>
+
+
+      </think>
+
+      '
+    stop_sequences:
+    - <|im_end|>
+    - <|im_start|>user
+    - <|im_start|>system
+  llama3:
+    name: Llama-3
+    bos_token: <|begin_of_text|>
+    system_prefix: '<|start_header_id|>system<|end_header_id|>
+
+
+      '
+    system_suffix: <|eot_id|>
+    user_prefix: '<|start_header_id|>user<|end_header_id|>
+
+
+      '
+    user_suffix: <|eot_id|>
+    assistant_prefix: '<|start_header_id|>assistant<|end_header_id|>
+
+
+      '
+    assistant_suffix: <|eot_id|>
+    assistant_prefill: '<|start_header_id|>assistant<|end_header_id|>
+
+
+      '
+    stop_sequences:
+    - <|eot_id|>
+    - <|end_of_text|>
+    - <|start_header_id|>user<|end_header_id|>
+  mistral:
+    name: Mistral V7
+    bos_token: <s>
+    system_prefix: '[SYSTEM_PROMPT]'
+    system_suffix: '[/SYSTEM_PROMPT]'
+    user_prefix: '[INST]'
+    user_suffix: '[/INST]'
+    assistant_prefix: ''
+    assistant_suffix: </s>
+    assistant_prefill: ''
+    stop_sequences:
+    - </s>
+    - '[INST]'
+  gemma2:
+    name: Gemma 2 / 4
+    system_prefix: '<start_of_turn>system
+
+      '
+    system_suffix: '<end_of_turn>
+
+      '
+    user_prefix: '<start_of_turn>user
+
+      '
+    user_suffix: '<end_of_turn>
+
+      '
+    assistant_prefix: '<start_of_turn>model
+
+      '
+    assistant_suffix: '<end_of_turn>
+
+      '
+    assistant_prefill: '<start_of_turn>model
+
+      '
+    stop_sequences:
+    - <end_of_turn>
+    - <start_of_turn>user
+    system_top_only: true
+  gemma4:
+    name: Gemma 4
+    bos_token: <bos>
+    system_prefix: '<|turn>system
+
+      '
+    system_suffix: '<turn|>
+
+      '
+    user_prefix: '<|turn>user
+
+      '
+    user_suffix: '<turn|>
+
+      '
+    assistant_prefix: '<|turn>model
+
+      '
+    assistant_suffix: '<turn|>
+
+      '
+    assistant_prefill: '<|turn>model
+
+      <|channel>thought
+
+      <channel|>'
+    stop_sequences:
+    - <turn|>
+    - <|turn>
+    system_top_only: true
+regex_post_process:
+- name: Strip trailing stop fragments
+  pattern: (?s)(?:<\|im_end\|>|<\|eot_id\|>|<end_of_turn>|</s>|<\|im_start\|>|<start_of_turn>).*$
+  replacement: ''
+- name: Strip think tags
+  pattern: (?is)<think>.*?</think>\s*
+  replacement: ''
+- name: Strip unclosed think tag
+  pattern: (?is)<think>.*$
+  replacement: ''
+- name: Strip leaked system notes
+  pattern: (?is)\[(?:System Note|OOC|Author's Note)[^\]]*\]\s*
+  replacement: ''
+- name: Strip leaked trailing OOC
+  pattern: (?is)[\(（]\s*OOC\s*[:：][^\)）]*[\)）]\s*$
+  replacement: ''

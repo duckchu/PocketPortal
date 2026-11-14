@@ -1,0 +1,26 @@
+# Optional persona overrides for the illustration module.
+#
+# Copy this file to `illust/personas/personas.yaml` and edit it to describe your
+# own characters. Keep only characters you have the rights to use. Do NOT commit
+# real LoRA file names or third-party copyrighted characters to a public repo.
+#
+# Each persona key maps to:
+#   pos:        list of prompt files under illust/prompts/ (e.g. my_char_pos.txt)
+#   neg:        list of negative prompt files
+#   lora:       list of [lora_file_name, strength] pairs (optional)
+#   clip_skip:  CLIP layer to stop at (default 2)
+#
+# Characters are matched by `keywords` against the loaded character card name.
+
+personas:
+  example_hero:
+    keywords: ["Aria", "aria"]
+    pos: ["aria_pos.txt"]
+    neg: ["aria_neg.txt"]
+    lora: []
+    clip_skip: 2
+
+# Mapping from a character-card name to a persona key. Any persona key listed
+# above can be used directly. Names are matched case-insensitively.
+name_map:
+  aria: example_hero

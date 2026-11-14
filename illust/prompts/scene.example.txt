@@ -1,0 +1,20 @@
+# Scene / background prompt library (example).
+# Format: [section_key] followed by comma-separated tags.
+
+[forest]
+forest, trees, sunlight through leaves, mossy ground,
+
+[library]
+library, bookshelves, warm lamplight, dust motes,
+
+[tavern]
+tavern interior, wooden tables, fireplace, warm light,
+
+[seaside]
+seaside, ocean, waves, blue sky, distant horizon,
+
+[night_street]
+night, street, streetlights, wet pavement, reflections,
+
+[ruins]
+ruins, broken stone walls, overgrown vines, mist,

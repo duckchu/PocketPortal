@@ -1,0 +1,21 @@
+# Clothing / state prompt library (example, SFW only).
+# Format: [section_key] on its own line, followed by comma-separated tags.
+# Copy to cloth.txt and edit for your own characters.
+
+[clothed]
+fully clothed, dressed, wearing clothes,
+
+[swimsuit]
+one-piece swimsuit, halter neck, bare shoulders,
+
+[bikini]
+two-piece swimsuit, bare shoulders, midriff,
+
+[cape]
+long cape, hood down, clasp at the neck,
+
+[armor]
+light armor, pauldrons, leather straps,
+
+[nightgown]
+long nightgown, frills, spaghetti straps, bare shoulders,

@@ -1,0 +1,22 @@
+# Facial expression prompt library (example).
+
+[smile]
+smile, gentle smile, soft expression,
+
+[laugh]
+laughing, open mouth, happy expression, closed eyes,
+
+[shy]
+shy, embarrassed, looking away, blush,
+
+[serious]
+serious, composed, focused gaze,
+
+[surprised]
+surprised, wide eyes, open mouth,
+
+[teary]
+teary eyes, watery eyes, emotional,
+
+[sleepy]
+sleepy, drowsy, half-lidded eyes, relaxed,
