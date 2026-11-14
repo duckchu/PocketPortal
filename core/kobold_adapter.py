@@ -644,7 +644,9 @@ class KoboldAdapter:
             "repeat_last_n": int(sampling_params.get("rep_pen_range", 2048)),
             "presence_penalty": float(sampling_params.get("presence_penalty", 0.45)),
             "frequency_penalty": float(sampling_params.get("frequency_penalty", 0.40)),
-            "stop": stop_sequences,
+            # Ollama Cloud rejects more than 4 stop sequences; keep the most
+            # specific ones (longest first) so leaks are still caught.
+            "stop": sorted(set(s for s in stop_sequences if s), key=len, reverse=True)[:4],
         }
         if "mirostat" in sampling_params:
             options["mirostat"] = int(sampling_params["mirostat"])
@@ -764,6 +766,12 @@ class KoboldAdapter:
                             except json.JSONDecodeError:
                                 continue
                             token = chunk.get("response")
+                            if not token:
+                                # Reasoning models stream their chain of thought in
+                                # `thinking` and may leave `response` empty when the
+                                # answer itself is the thought. Fall back to it so the
+                                # user never sees a blank reply.
+                                token = chunk.get("thinking")
                             if token:
                                 yield str(token)
                             if chunk.get("done"):

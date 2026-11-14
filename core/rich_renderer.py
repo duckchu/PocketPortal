@@ -122,6 +122,17 @@ def format_markdown_table(table_text: str) -> str:
 
     return "\n<pre>\n" + html.escape("\n".join(output_lines)) + "\n</pre>\n"
 
+
+def _format_roleplay_paragraphs(text: str) -> str:
+    """Separate interleaved *narration* and \"dialogue\" into distinct paragraphs for readability."""
+    # Split between closing *narration* and opening "dialogue" / 「dialogue」
+    text = re.sub(r"(\*[^*\n]+\*)[ \t]+([\"\u201c\u300c])", r"\1\n\n\2", text)
+    # Split between closing "dialogue" / 」 and opening *narration*
+    text = re.sub(r"([\"\u201d\u300d])[ \t]+(\*[^*\n]+\*)", r"\1\n\n\2", text)
+    # Collapse 3+ newlines into 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text
+
 def convert_markdown_to_telegram_html(text: str, native_tables: bool = True) -> str:
     """
     Complies with RICH_TEXT.md for Telegram Rich Message output:
@@ -192,6 +203,8 @@ def convert_markdown_to_telegram_html(text: str, native_tables: bool = True) -> 
 
     #
     text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+
+    text = _format_roleplay_paragraphs(text)
 
     # Step 4: HTML escape remaining text
     text = html.escape(text)

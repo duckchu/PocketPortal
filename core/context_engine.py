@@ -787,12 +787,12 @@ class ContextEngine:
                 pass
 
         text = re.sub(
-            r"(?is)```[a-zA-Z0-9_-]*\s*(?:System Prompt|[System Prompt]|[System Prompt]|\[System Note|[Highest Priority|[Turn Rule).*?(?:```|$)",
+            r"(?is)```[a-zA-Z0-9_-]*\s*(?:System Prompt|\[System Prompt\]|\[System Note|\[Highest Priority|\[Turn Rule).*?(?:```|$)",
             "",
             text,
         )
         text = re.sub(
-            r"(?is)(?:\n|\r|^)\s*(?:System Prompt|[System Prompt]|[System Prompt]|\[System Note|[Highest Priority|[Turn Rule).*$",
+            r"(?is)(?:\n|\r|^)\s*(?:System Prompt|\[System Prompt\]|\[System Note|\[Highest Priority|\[Turn Rule).*$",
             "",
             text,
         )
