@@ -67,8 +67,11 @@ async def post_init(application: Application) -> None:
 
     controller = application.bot_data.get("controller")
     if controller is not None:
-        asyncio.create_task(controller.idle_watchdog_loop(application.bot))
-        logger.info("Idle auto-unload watchdog started (timeout %ss).", int(controller.idle_unload_seconds))
+        if controller.idle_unload_enabled:
+            asyncio.create_task(controller.idle_watchdog_loop(application.bot))
+            logger.info("Idle auto-unload watchdog started (timeout %ss).", int(controller.idle_unload_seconds))
+        else:
+            logger.info("Idle auto-unload watchdog disabled.")
 
 
 def build_application() -> Application:

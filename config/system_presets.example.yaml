@@ -1,8 +1,8 @@
 presets:
   immersive:
     name: Roleplay - Immersive
-    system_prompt: "You are {{char}}. Write in third person limited, staying strictly
-      inside {{char}}'s point of view for narration while portraying only {{char}}.
+    system_prompt: 'You are {{char}}. Write in third person limited, staying strictly
+      inside {{char}}''s point of view for narration while portraying only {{char}}.
 
       1. [Narration]: Plain prose, no brackets or asterisks. Each reply is 1-2 paragraphs
       (100-220 words) and ends at a natural pause that invites {{user}} to respond.
@@ -13,14 +13,14 @@ presets:
       3. [Character]: Stay 100% in character at all times. Honour the card personality,
       background, speech habits, and knowledge limits.
 
-      4. [Format]: Inner thoughts in parentheses (like *...*) only when the card uses it,
-      dialogue in double quotes, actions in plain narration.
+      4. [Format]: Inner thoughts in parentheses (like *...*) only when the card uses
+      it, dialogue in double quotes, actions in plain narration.
 
-      "
+      '
     jailbreak_prefill: ''
-    post_history_instructions: '[Style reminder: 1. Stay fully as {{char}} with 1-2 paragraph
-      replies. 2. Never act or speak for {{user}}. 3. Keep 100% in character. 4. Use plain
-      narration, quotes for dialogue, and parentheses for inner thoughts.]'
+    post_history_instructions: '[Style reminder: 1. Stay fully as {{char}} with 1-2
+      paragraph replies. 2. Never act or speak for {{user}}. 3. Keep 100% in character.
+      4. Use plain narration, quotes for dialogue, and parentheses for inner thoughts.]'
     terminal_instruction: '[System Note: Continue as "{{char}}" with natural pacing
       (1-2 paragraphs, 80-180 words). Never write lines or actions for "{{user}}".
       Stay 100% in character, keeping tone and knowledge consistent.]'
@@ -60,6 +60,7 @@ instruct_templates:
     - <|im_end|>
     - <|im_start|>user
     - <|im_start|>system
+    system_top_only: true
   chatml_think:
     name: ChatML (Bypass Think)
     system_prefix: '<|im_start|>system
@@ -84,6 +85,7 @@ instruct_templates:
 
       <think>
 
+      Executing sandbox roleplay as {{char}}. Stay in character and respond directly.
 
       </think>
 
@@ -92,6 +94,7 @@ instruct_templates:
     - <|im_end|>
     - <|im_start|>user
     - <|im_start|>system
+    system_top_only: true
   llama3:
     name: Llama-3
     bos_token: <|begin_of_text|>
@@ -183,14 +186,45 @@ instruct_templates:
 
       <|channel>thought
 
+      Executing sandbox roleplay as {{char}}.
+
       <channel|>'
     stop_sequences:
     - <turn|>
     - <|turn>
     system_top_only: true
+  glm4:
+    name: GLM-4 (Think)
+    bos_token: '[gMASK]<sop>'
+    system_top_only: true
+    system_prefix: '<|system|>
+
+      '
+    system_suffix: ''
+    user_prefix: '<|user|>
+
+      '
+    user_suffix: ''
+    assistant_prefix: '<|assistant|>
+
+      '
+    assistant_suffix: ''
+    assistant_prefill: '<|assistant|>
+
+      <think>
+
+      Executing sandbox roleplay as {{char}}. Stay in character and respond directly.
+
+      </think>
+
+      '
+    stop_sequences:
+    - <|user|>
+    - <|system|>
+    - <|observation|>
 regex_post_process:
 - name: Strip trailing stop fragments
-  pattern: (?s)(?:<\|im_end\|>|<\|eot_id\|>|<end_of_turn>|</s>|<\|im_start\|>|<start_of_turn>).*$
+  pattern: (?s)(?:<\|im_end\|>|<\|eot_id\|>|<end_of_turn>|</s>|<\|im_start\|>|<start_of_turn>|<\|user\|>|<\|observation\|>).*$
   replacement: ''
 - name: Strip think tags
   pattern: (?is)<think>.*?</think>\s*

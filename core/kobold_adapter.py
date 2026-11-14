@@ -625,29 +625,29 @@ class KoboldAdapter:
         seed: Optional[int] = None,
         temp_override: Optional[float] = None,
     ) -> dict[str, Any]:
-        temp = temp_override if temp_override is not None else float(sampling_params.get("temp", 0.9))
-        rep_pen = float(sampling_params.get("rep_pen", 1.04))
-        dry_mult = float(sampling_params.get("dry_multiplier", 0.0))
-        # Ollama lacks native DRY sampler; boost repeat/presence/frequency penalties and use RP-tuned sampling
-        effective_rep_pen = max(rep_pen, 1.15) if (dry_mult > 0 or rep_pen < 1.1) else rep_pen
+        temp = temp_override if temp_override is not None else float(sampling_params.get("temp", 0.85))
+        rep_pen = float(sampling_params.get("rep_pen", 1.05))
         top_k = int(sampling_params.get("top_k", 0)) or 40
         top_p = min(float(sampling_params.get("top_p", 0.95)), 0.95)
-        min_p = float(sampling_params.get("min_p", 0.06))
+        min_p = float(sampling_params.get("min_p", 0.05))
         options: dict[str, Any] = {
             "num_ctx": int(max_context or 65536),
-            "num_predict": int(sampling_params.get("max_length", 8192)),
+            "num_predict": int(sampling_params.get("max_length", 1024)),
             "temperature": temp,
             "min_p": min_p,
             "top_p": top_p,
             "top_k": top_k,
-            "repeat_penalty": effective_rep_pen,
-            "repeat_last_n": int(sampling_params.get("rep_pen_range", 2048)),
-            "presence_penalty": float(sampling_params.get("presence_penalty", 0.45)),
-            "frequency_penalty": float(sampling_params.get("frequency_penalty", 0.40)),
-            # Ollama Cloud rejects more than 4 stop sequences; keep the most
-            # specific ones (longest first) so leaks are still caught.
-            "stop": sorted(set(s for s in stop_sequences if s), key=len, reverse=True)[:4],
+            "repeat_penalty": rep_pen,
+            "repeat_last_n": int(sampling_params.get("rep_pen_range", 1024)),
+            "presence_penalty": float(sampling_params.get("presence_penalty", 0.0)),
+            "frequency_penalty": float(sampling_params.get("frequency_penalty", 0.0)),
         }
+        primary_stops = []
+        for s in stop_sequences[:2]:
+            if s and s not in primary_stops:
+                primary_stops.append(s)
+        extra_stops = [s for s in stop_sequences[2:] if s and s not in primary_stops]
+        options["stop"] = (primary_stops + extra_stops)[:4]
         if "mirostat" in sampling_params:
             options["mirostat"] = int(sampling_params["mirostat"])
             options["mirostat_tau"] = float(sampling_params.get("mirostat_tau", 5.0))

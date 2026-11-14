@@ -22,4 +22,5 @@ default_user_persona: '{{user}} is a calm, observant adventurer exploring the wo
 
   '
 stream_interval_sec: 1.6
+idle_unload_enabled: true
 idle_unload_seconds: 300

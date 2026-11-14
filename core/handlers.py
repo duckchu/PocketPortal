@@ -83,6 +83,7 @@ class BotController:
         self.allowed_ids: set[int] = {int(x) for x in (bot_config.get("allowed_user_ids") or [])}
         self.stream_interval: float = float(bot_config.get("stream_interval_sec", 1.6))
         self.idle_unload_seconds: float = float(bot_config.get("idle_unload_seconds", 300))
+        self.idle_unload_enabled: bool = bool(bot_config.get("idle_unload_enabled", True)) and self.idle_unload_seconds > 0
         self.comfyui_url: str = str(bot_config.get("comfyui_url", "http://127.0.0.1:8188")).rstrip("/")
         self.comfyui_checkpoint: str = str(
             bot_config.get("comfyui_checkpoint", "model.safetensors")
@@ -2156,7 +2157,7 @@ class BotController:
                 await self._safe_send_html(query.message, f"【{speaker}】\n{t.text}")
 
     async def check_idle_and_unload(self, bot: Any) -> bool:
-        if self.idle_unload_seconds <= 0:
+        if not self.idle_unload_enabled or self.idle_unload_seconds <= 0:
             return False
         if any(rt.generating for rt in self.chats.values()):
             return False
