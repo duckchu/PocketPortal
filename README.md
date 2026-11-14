@@ -97,3 +97,8 @@ cp illust/prompts/cloth.example.txt illust/prompts/cloth.txt
 `illust/prompts/*.txt` and `illust/personas/*.yaml` are git-ignored. Set
 `ST_PERSONAS_FILE=/path/to/personas.yaml` to keep them outside the repo.
 Only use characters and LoRA models you have the rights to use.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
