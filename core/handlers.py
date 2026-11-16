@@ -1928,23 +1928,42 @@ class BotController:
             if action == "play" and chapters:
                 arc["enabled"] = True
                 sess.story_arc = arc
+                if len(sess.turns) <= 1:
+                    await self._safe_edit_text(
+                        context.bot,
+                        chat_id,
+                        query.message.message_id,
+                        f"▶️ Starting arc \"<b>{_esc(arc.get('title', rt.character.name))}</b>\"...",
+                        already_html=True,
+                    )
+                    try:
+                        opening = await self._generate_arc_opening_scene(rt.character, sess.user_name, arc, sess)
+                    except Exception:
+                        opening = self.engine.replace_macros(rt.character.first_mes, rt.character.name, sess.user_name)
+                    if opening:
+                        turn = sess.append_turn(role="assistant", text=opening)
+                        sent = await self._safe_send_html(query.message, turn.text, reply_markup=self.swipe_keyboard(turn))
+                        if sent:
+                            turn.set_message_ids(self._last_chunk_ids or [sent.message_id])
+                    self.storage.save_session(sess)
+                    return
+                cur_idx = min(max(0, int(arc.get("current_chapter", 0))), len(chapters) - 1)
+                ch = chapters[cur_idx] if isinstance(chapters[cur_idx], dict) else {}
+                ch_name = str(ch.get("name", f"Chapter {cur_idx + 1}"))
+                ch_goal = str(ch.get("goal", ""))
                 await self._safe_edit_text(
                     context.bot,
                     chat_id,
                     query.message.message_id,
-                    f"▶️ Starting arc \"<b>{_esc(arc.get('title', rt.character.name))}</b>\"...",
+                    f"▶️ Continuing arc \"<b>{_esc(arc.get('title', rt.character.name))}</b>\" ({_esc(ch_name)})...",
                     already_html=True,
                 )
-                try:
-                    opening = await self._generate_arc_opening_scene(rt.character, sess.user_name, arc, sess)
-                except Exception:
-                    opening = self.engine.replace_macros(rt.character.first_mes, rt.character.name, sess.user_name)
-                if opening:
-                    turn = sess.append_turn(role="assistant", text=opening)
-                    sent = await self._safe_send_html(query.message, turn.text, reply_markup=self.swipe_keyboard(turn))
-                    if sent:
-                        turn.set_message_ids(self._last_chunk_ids or [sent.message_id])
+                sess.plot_once = (
+                    f"[Director: Naturally weave in the current chapter's beat "
+                    f"({ch_name}: {ch_goal}) without resetting the scene or repeating earlier events.]"
+                )
                 self.storage.save_session(sess)
+                await self._generate_turn(context.bot, chat_id, query.message, is_ooc=False)
                 return
             if action == "adapt":
                 await query.edit_message_text("🔀 Rebuilding the remaining chapters from the conversation...")
@@ -2028,6 +2047,7 @@ class BotController:
                     active_model=self.kobold.active_model_key,
                     user_name=user_name,
                     include_first_mes=True,
+                    chat_id=chat_id,
                 )
                 rt.character = char
                 rt.session = sess
@@ -2521,6 +2541,9 @@ class BotController:
         fname = (doc.file_name or "").lower()
         mime = (doc.mime_type or "").lower()
         if not (fname.endswith(".png") or mime == "image/png"):
+            return
+        if doc.file_size and doc.file_size > 15 * 1024 * 1024:
+            await update.effective_message.reply_text("❌ PNG character card exceeds the 15MB size limit.")
             return
 
         rt = self.get_runtime(update.effective_chat.id)

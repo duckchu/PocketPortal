@@ -613,8 +613,12 @@ class StorageManager:
         raw = self.extract_chara_from_png(png_bytes)
         data = raw.get("data") if isinstance(raw.get("data"), dict) else raw
         char_name = str(data.get("name") or raw.get("name") or fallback_name).strip()
-        filename = f"{_safe_filename(char_name, 'imported_char')}.json"
+        stem = _safe_filename(char_name, "imported_char")
+        filename = f"{stem}.json"
         out_path = self.characters_dir / filename
+        if out_path.exists():
+            filename = f"{stem}_{uuid.uuid4().hex[:4]}.json"
+            out_path = self.characters_dir / filename
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(raw, f, ensure_ascii=False, indent=2)
         return self.load_character(filename)
