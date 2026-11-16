@@ -23,7 +23,7 @@ from telegram.error import BadRequest, RetryAfter, TelegramError
 from telegram.ext import ContextTypes
 
 from core.context_engine import AssembledPrompt, ContextEngine
-from core.kobold_adapter import KoboldAdapter
+from core.llm_adapter import LLMAdapter
 from illust.comfy_gen import (
     DEFAULT_NEGATIVE,
     assemble_persona_prompt,
@@ -67,12 +67,12 @@ class ChatRuntime:
 
 
 class BotController:
-    """Coordinates StorageManager, KoboldAdapter, ContextEngine, and Telegram state."""
+    """Coordinates StorageManager, LLMAdapter, ContextEngine, and Telegram state."""
 
     def __init__(
         self,
         storage: StorageManager,
-        kobold: KoboldAdapter,
+        kobold: LLMAdapter,
         engine: ContextEngine,
         bot_config: dict[str, Any],
     ) -> None:
@@ -918,10 +918,13 @@ class BotController:
                 InlineKeyboardButton("⏮️ Prev Chapter", callback_data="arc_ctl:prev"),
                 InlineKeyboardButton("⏭️ Next Chapter", callback_data="arc_ctl:next"),
             ],
-            [InlineKeyboardButton("🔀 Adapt Arc to Current Plot", callback_data="arc_ctl:adapt")],
             [
+                InlineKeyboardButton("🔀 Adapt Arc", callback_data="arc_ctl:adapt"),
                 InlineKeyboardButton("🎲 Regenerate Arc", callback_data="arc_ctl:regen"),
+            ],
+            [
                 InlineKeyboardButton(toggle_label, callback_data="arc_ctl:toggle"),
+                InlineKeyboardButton("▶️ Start Arc", callback_data="arc_ctl:play"),
             ],
         ])
         return "\n".join(lines), kb
@@ -1915,6 +1918,27 @@ class BotController:
                 await self._safe_edit_text(
                     context.bot, chat_id, query.message.message_id, text, reply_markup=kb, already_html=True
                 )
+                return
+            if action == "play" and chapters:
+                arc["enabled"] = True
+                sess.story_arc = arc
+                await self._safe_edit_text(
+                    context.bot,
+                    chat_id,
+                    query.message.message_id,
+                    f"▶️ Starting arc \"<b>{_esc(arc.get('title', rt.character.name))}</b>\"...",
+                    already_html=True,
+                )
+                try:
+                    opening = await self._generate_arc_opening_scene(rt.character, sess.user_name, arc, sess)
+                except Exception:
+                    opening = self.engine.replace_macros(rt.character.first_mes, rt.character.name, sess.user_name)
+                if opening:
+                    turn = sess.append_turn(role="assistant", text=opening)
+                    sent = await self._safe_send_html(query.message, turn.text, reply_markup=self.swipe_keyboard(turn))
+                    if sent:
+                        turn.set_message_ids(self._last_chunk_ids or [sent.message_id])
+                self.storage.save_session(sess)
                 return
             if action == "adapt":
                 await query.edit_message_text("🔀 Rebuilding the remaining chapters from the conversation...")

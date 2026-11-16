@@ -13,7 +13,7 @@ import yaml
 
 from core.context_engine import ContextEngine
 from core.handlers import BotController
-from core.kobold_adapter import KoboldAdapter
+from core.llm_adapter import LLMAdapter
 from core.storage import CharacterCard, LorebookEntry, StorageManager, Turn
 
 
@@ -112,7 +112,7 @@ def _make_stack(tmp_workspace: Path):
     (tmp_workspace / "config" / "system_presets.yaml").write_text(yaml.safe_dump(presets_cfg), encoding="utf-8")
 
     storage = StorageManager(tmp_workspace)
-    kobold = KoboldAdapter(bot_config=bot_cfg, models_config=models_cfg, logs_dir=storage.logs_dir)
+    kobold = LLMAdapter(bot_config=bot_cfg, models_config=models_cfg, logs_dir=storage.logs_dir)
     engine = ContextEngine(storage=storage, kobold=kobold, bot_config=bot_cfg, presets_config=presets_cfg)
     return storage, kobold, engine, bot_cfg
 

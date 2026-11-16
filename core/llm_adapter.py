@@ -20,7 +20,7 @@ import psutil
 logger = logging.getLogger("STLite.Kobold")
 
 
-class KoboldAdapter:
+class LLMAdapter:
     """Client and process manager for KoboldCpp Native API."""
 
     def __init__(
@@ -647,7 +647,7 @@ class KoboldAdapter:
             if s and s not in primary_stops:
                 primary_stops.append(s)
         extra_stops = [s for s in stop_sequences[2:] if s and s not in primary_stops]
-        options["stop"] = (primary_stops + extra_stops)[:4]
+        options["stop"] = [s for s in (primary_stops + extra_stops) if s != "<|im_start|>"][:4]
         if "mirostat" in sampling_params:
             options["mirostat"] = int(sampling_params["mirostat"])
             options["mirostat_tau"] = float(sampling_params.get("mirostat_tau", 5.0))
@@ -831,3 +831,5 @@ class KoboldAdapter:
                     text = results[0].get("text", "")
                     if text:
                         yield str(text)
+
+KoboldAdapter = LLMAdapter

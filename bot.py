@@ -19,7 +19,7 @@ from telegram.ext import (
 
 from core.context_engine import ContextEngine
 from core.handlers import BotController
-from core.kobold_adapter import KoboldAdapter
+from core.llm_adapter import LLMAdapter
 from core.storage import StorageManager
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -88,7 +88,7 @@ def build_application() -> Application:
         )
         sys.exit(1)
 
-    kobold = KoboldAdapter(bot_config=bot_config, models_config=models_config, logs_dir=storage.logs_dir)
+    kobold = LLMAdapter(bot_config=bot_config, models_config=models_config, logs_dir=storage.logs_dir)
     engine = ContextEngine(storage=storage, kobold=kobold, bot_config=bot_config, presets_config=presets_config)
     controller = BotController(storage=storage, kobold=kobold, engine=engine, bot_config=bot_config)
 

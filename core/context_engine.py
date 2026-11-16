@@ -10,7 +10,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-from core.kobold_adapter import KoboldAdapter
+from core.llm_adapter import LLMAdapter
 from core.rich_renderer import convert_markdown_to_telegram_html
 from core.storage import CharacterCard, LorebookEntry, SessionState, StorageManager
 
@@ -40,7 +40,7 @@ class ContextEngine:
     def __init__(
         self,
         storage: StorageManager,
-        kobold: KoboldAdapter,
+        kobold: LLMAdapter,
         bot_config: dict[str, Any],
         presets_config: dict[str, Any],
     ) -> None:
@@ -746,6 +746,7 @@ class ContextEngine:
         is_preview: bool = False,
     ) -> str:
         text = raw_text or ""
+        text = re.sub(r"^\s*<\|im_start\|>(?:assistant|user|system)?\s*", "", text)
         text = re.sub(r"(?is)(?:<think>[\s\S]*?</think>|<\|channel>thought[\s\S]*?<channel\|>)\s*", "", text)
         if is_preview:
             low = text.lower()
