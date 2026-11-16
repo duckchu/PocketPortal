@@ -314,7 +314,7 @@ class ContextEngine:
         exclude_last_assistant: bool = False,
         continue_mode: bool = False,
     ) -> AssembledPrompt:
-        m_key = model_key or session.active_model or self.kobold.active_model_key
+        m_key = model_key or (self.kobold.active_model_key if self.kobold else "") or session.active_model
         model_info = self.kobold.get_model_info(m_key)
         max_context = int(model_info.get("context_size", 8192))
         max_gen = int((model_info.get("sampling") or {}).get("max_length", 744))
@@ -332,7 +332,10 @@ class ContextEngine:
         if exclude_last_assistant and base_turns and base_turns[-1].role == "assistant":
             base_turns.pop()
 
-        scan_chunks = [t.text for t in base_turns[-6:]]
+        scan_window = 24 if max_context >= 262144 else (12 if max_context >= 65536 else 6)
+        scan_chunks = [t.text for t in base_turns[-scan_window:]]
+        if session.story_summary.strip():
+            scan_chunks.append(session.story_summary)
         if pending_user_text:
             scan_chunks.append(pending_user_text)
         if director_instruction:
@@ -475,9 +478,15 @@ class ContextEngine:
         terminal_role: Optional[str] = None
         terminal_content = ""
 
+        earlier_summarized_turns = [
+            t for t in base_turns if t.turn_id <= session.summary_upto_turn_id
+        ]
         history_for_stage4 = [
             t for t in base_turns if t.turn_id > session.summary_upto_turn_id
         ]
+        if not history_for_stage4 and earlier_summarized_turns:
+            history_for_stage4 = list(earlier_summarized_turns)
+            earlier_summarized_turns = []
         continue_prefill = ""
         if continue_mode and history_for_stage4 and history_for_stage4[-1].role == "assistant":
             last_a = history_for_stage4.pop()
@@ -565,6 +574,7 @@ class ContextEngine:
                 stage3_block = ""
 
         selected_turns: list[tuple[str, str]] = []
+        all_primary_fitted = True
         for turn in reversed(history_for_stage4):
             t_text = self.replace_macros(turn.text.strip(), char_name, user_name)
             wrapped = self._wrap_block(turn.role, t_text, tpl)
@@ -585,7 +595,31 @@ class ContextEngine:
                 selected_turns.append((turn.role, wrapped))
                 remaining_tokens -= t_tokens
             else:
+                all_primary_fitted = False
                 break
+
+        if all_primary_fitted and earlier_summarized_turns and max_context >= 32768:
+            for turn in reversed(earlier_summarized_turns):
+                t_text = self.replace_macros(turn.text.strip(), char_name, user_name)
+                wrapped = self._wrap_block(turn.role, t_text, tpl)
+                if not wrapped:
+                    continue
+                text_hash = hashlib.md5(wrapped.encode("utf-8")).hexdigest()[:12]
+                t_cache = turn.metadata.get("token_cache")
+                cached_entry = t_cache.get(tpl_name) if isinstance(t_cache, dict) else None
+                if isinstance(cached_entry, dict) and cached_entry.get("h") == text_hash:
+                    t_tokens = int(cached_entry["t"])
+                else:
+                    t_tokens = self.kobold.estimate_tokens_fallback(wrapped)
+                    turn.metadata.setdefault("token_cache", {})[tpl_name] = {
+                        "h": text_hash,
+                        "t": t_tokens,
+                    }
+                if t_tokens <= remaining_tokens:
+                    selected_turns.append((turn.role, wrapped))
+                    remaining_tokens -= t_tokens
+                else:
+                    break
         selected_turns.reverse()
 
         # Interleave Stage 5 (@Depth 4) and Stage 6 (@Depth 2) relative to total chat tail

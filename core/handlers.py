@@ -659,13 +659,22 @@ class BotController:
     def _collect_world_context_for_arc(
         self, character: CharacterCard, session: Optional[SessionState] = None
     ) -> str:
+        model_info = self.kobold.get_model_info(self.kobold.active_model_key)
+        max_ctx = int(model_info.get("context_size", 65536))
+        is_long = max_ctx >= 65536
+        desc_limit = 16000 if is_long else 900
+        pers_limit = 8000 if is_long else 500
+        scen_limit = 8000 if is_long else 600
+
         parts: list[str] = [f"Character: {character.name}"]
         if character.description.strip():
-            parts.append(f"Description:\n{character.description.strip()[:900]}")
+            parts.append(f"Description:\n{character.description.strip()[:desc_limit]}")
         if character.personality.strip():
-            parts.append(f"Personality:\n{character.personality.strip()[:500]}")
+            parts.append(f"Personality:\n{character.personality.strip()[:pers_limit]}")
         if character.scenario.strip():
-            parts.append(f"Scenario:\n{character.scenario.strip()[:600]}")
+            parts.append(f"Scenario:\n{character.scenario.strip()[:scen_limit]}")
+        if is_long and character.mes_example.strip():
+            parts.append(f"Example Dialogue:\n{character.mes_example.strip()[:4000]}")
 
         lb_names = list(session.bound_lorebooks) if session else list(character.bound_lorebooks)
         lore_entries = []
@@ -763,15 +772,44 @@ class BotController:
             "divergence_note": "",
         }
 
-    async def _run_raw_llm_prompt(self, user_prompt: str, max_length: int = 1200, temp: float = 0.7) -> str:
+    async def _run_raw_llm_prompt(
+        self,
+        user_prompt: str,
+        max_length: int = 1200,
+        temp: float = 0.7,
+        roleplay_mode: bool = False,
+        char_name: str = "",
+        user_name: str = "",
+    ) -> str:
         await self.kobold.ensure_running()
         tpl_name = self.kobold.get_active_instruct_template()
         tpl = self.engine._get_template(tpl_name)
-        assistant_start = str(
-            tpl.get("assistant_prefill") or tpl.get("assistant_prefix", "<|im_start|>assistant\n")
-        )
+        model_info = self.kobold.get_model_info(self.kobold.active_model_key)
+        if roleplay_mode:
+            sys_suffix = str(model_info.get("system_prompt_suffix") or "").strip()
+            if sys_suffix and char_name:
+                sys_suffix = self.engine.replace_macros(sys_suffix, char_name, user_name)
+            sys_block = self.engine._wrap_block("system", sys_suffix, tpl) if sys_suffix else ""
+            raw_prefill = str(tpl.get("assistant_prefill") or tpl.get("assistant_prefix", "<|im_start|>assistant\n"))
+            assistant_start = self.engine.replace_macros(raw_prefill, char_name, user_name) if char_name else raw_prefill
+        else:
+            sys_text = (
+                "[MODE: SANDBOX]\n"
+                "You are a professional interactive story architect. Output ONLY valid JSON matching the requested schema. "
+                "Do NOT enter character roleplay dialogue or add any commentary."
+            )
+            sys_block = self.engine._wrap_block("system", sys_text, tpl)
+            raw_prefill = str(tpl.get("assistant_prefill") or "")
+            if "<think>" in raw_prefill:
+                prefix = str(tpl.get("assistant_prefix") or "<|im_start|>assistant\n")
+                assistant_start = f"{prefix}<think>\nExecuting sandbox story-architect JSON task.\n</think>\n"
+            elif "<|channel>thought" in raw_prefill:
+                assistant_start = "<|turn>model\n<|channel>thought\nExecuting sandbox story-architect JSON task.\n<channel|>"
+            else:
+                assistant_start = str(tpl.get("assistant_prefix") or "<|im_start|>assistant\n")
         full_prompt = (
             str(tpl.get("bos_token", ""))
+            + sys_block
             + self.engine._wrap_block("user", user_prompt, tpl)
             + assistant_start
         )
@@ -814,7 +852,7 @@ class BotController:
             f"{self.engine.replace_macros(world_ctx, character.name, user_name)}"
         )
         prompt = self.engine.replace_macros(prompt, character.name, user_name)
-        raw = await self._run_raw_llm_prompt(prompt, max_length=1400, temp=0.75)
+        raw = await self._run_raw_llm_prompt(prompt, max_length=3200, temp=0.75)
         arc = self._parse_story_arc_output(raw, character.name, theme_hint)
         if self.engine._opencc is not None:
             try:
@@ -848,7 +886,7 @@ class BotController:
             f"Chapter 1: {ch1.get('name', '')} — {ch1.get('goal', '')} (hooks: {ch1.get('hooks', '')})\n\n"
             f"{self.engine.replace_macros(world_ctx, character.name, user_name)}"
         )
-        raw = await self._run_raw_llm_prompt(prompt, max_length=900, temp=0.85)
+        raw = await self._run_raw_llm_prompt(prompt, max_length=1200, temp=0.85, roleplay_mode=True, char_name=character.name, user_name=user_name)
         cleaned = self.engine.post_process_output(raw, character.name, user_name)
         return cleaned or self.engine.replace_macros(character.first_mes, character.name, user_name)
 
@@ -877,7 +915,7 @@ class BotController:
             f"Current arc JSON:\n{cur_json}\n\n"
             f"{dir_line}{summary_block}[Recent transcript]\n{transcript}"
         )
-        raw = await self._run_raw_llm_prompt(prompt, max_length=1400, temp=0.65)
+        raw = await self._run_raw_llm_prompt(prompt, max_length=3200, temp=0.65)
         updated = self._parse_story_arc_output(raw, rt.character.name, arc.get("premise", ""))
         if not updated.get("title") and arc.get("title"):
             updated["title"] = arc["title"]
@@ -2096,6 +2134,7 @@ class BotController:
                 await query.edit_message_text("⚠️ Save list expired. Run /load again.")
                 return
             sess = self.storage.load_session(path_str)
+            sess.active_model = self.kobold.active_model_key
             char = self.storage.load_character(sess.char_filename or sess.char_name)
             rt.session = sess
             rt.character = char
