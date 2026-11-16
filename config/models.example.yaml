@@ -34,6 +34,21 @@ models:
       rep_pen: 1.04
       rep_pen_range: 2048
       max_length: 1024
+  rkllama-example:
+    backend: ollama
+    ollama_model: tinyllama-chat:1.1b
+    display_name: '[RKLLama] Example TinyLlama 1.1B'
+    vram_gb: 1.5
+    context_size: 4096  # Match .rkllm max_context_limit (typically 4096)
+    instruct_template: zephyr
+    sampling:
+      temp: 0.7
+      min_p: 0.1
+      top_p: 1.0
+      top_k: 0
+      rep_pen: 1.04
+      rep_pen_range: 2048
+      max_length: 1024
   mlx-example:
     backend: mlx
     mlx_model: mlx-community/example-model-4bit

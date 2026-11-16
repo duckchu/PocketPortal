@@ -98,6 +98,27 @@ cp illust/prompts/cloth.example.txt illust/prompts/cloth.txt
 `ST_PERSONAS_FILE=/path/to/personas.yaml` to keep them outside the repo.
 Only use characters and LoRA models you have the rights to use.
 
+## Example Characters & Lorebooks
+
+PocketPortal ships neutral example character cards (`characters/*.yaml.example`) and lorebooks (`lorebooks/*.json.example`). Copy the examples you want to use:
+
+```bash
+cp characters/example_character.yaml.example characters/example_character.yaml
+cp lorebooks/example_lorebook.json.example lorebooks/example_lorebook.json
+```
+
+Other bundled examples include `little_prince.yaml.example`, `peter_pan.yaml.example`, `snow_white.yaml.example`, and their corresponding `*_lorebook.json.example` files.
+
+## RK3588 NPU (rkllama) Backend
+
+To use [rkllama](https://github.com/NotPunchnox/rkllama) on Rockchip RK3588/RK3576 devices:
+
+1. Point `ollama_url` in `config/bot_config.yaml` to your `rkllama` server (default port `8080`):
+   ```yaml
+   ollama_url: http://127.0.0.1:8080
+   ```
+2. Add your `.rkllm` models in `config/models.yaml` with `backend: ollama` and set `context_size: 4096` (or match your `.rkllm` model's `max_context_limit`). See `rkllama-example` in `config/models.example.yaml`.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
