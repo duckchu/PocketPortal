@@ -59,7 +59,11 @@ class ChatRuntime:
 
     def register_id(self, prefix: str, full_value: str) -> str:
         sid = _short_id(f"{prefix}:{full_value}")
-        self.id_map[f"{prefix}:{sid}"] = full_value
+        key = f"{prefix}:{sid}"
+        self.id_map[key] = full_value
+        while len(self.id_map) > 500:
+            oldest = next(iter(self.id_map))
+            self.id_map.pop(oldest, None)
         return sid
 
     def resolve_id(self, prefix: str, sid: str) -> Optional[str]:
@@ -81,6 +85,8 @@ class BotController:
         self.engine = engine
         self.bot_config = bot_config
         self.allowed_ids: set[int] = {int(x) for x in (bot_config.get("allowed_user_ids") or [])}
+        if not self.allowed_ids:
+            logger.warning("allowed_user_ids is empty; all Telegram requests will be denied (fail-closed).")
         self.stream_interval: float = float(bot_config.get("stream_interval_sec", 1.6))
         self.idle_unload_seconds: float = float(bot_config.get("idle_unload_seconds", 300))
         self.idle_unload_enabled: bool = bool(bot_config.get("idle_unload_enabled", True)) and self.idle_unload_seconds > 0
@@ -100,9 +106,9 @@ class BotController:
         self._last_chunk_ids: list[int] = []
 
     def is_authorized(self, user_id: Optional[int]) -> bool:
-        if not self.allowed_ids:
-            return True
-        return user_id is not None and int(user_id) in self.allowed_ids
+        if not self.allowed_ids or user_id is None:
+            return False
+        return int(user_id) in self.allowed_ids
 
     def get_runtime(self, chat_id: int) -> ChatRuntime:
         self.last_active_chat_id = chat_id

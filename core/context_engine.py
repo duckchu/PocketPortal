@@ -135,6 +135,8 @@ class ContextEngine:
         regex_m = re.fullmatch(r"/(.+)/([imsgu]*)", key, flags=re.DOTALL)
         if regex_m:
             pattern, flags_str = regex_m.group(1), regex_m.group(2)
+            if len(pattern) > 120:
+                return False
             flags = 0
             if "i" in flags_str:
                 flags |= re.IGNORECASE

@@ -421,6 +421,9 @@ class StorageManager:
 
         if not target.exists():
             raise FileNotFoundError(f"Character not found: {name_or_filename}")
+        base_dir = self.characters_dir.resolve()
+        if not target.resolve().is_relative_to(base_dir):
+            raise ValueError(f"Invalid character path outside directory: {name_or_filename}")
 
         if target.suffix.lower() in {".yaml", ".yml"}:
             raw = self._load_yaml(target)
@@ -513,7 +516,10 @@ class StorageManager:
 
     def load_lorebook(self, filename: str) -> list[LorebookEntry]:
         resolved = self._resolve_lorebook_filename(filename)
-        path = self.lorebooks_dir / resolved
+        base = self.lorebooks_dir.resolve()
+        path = (self.lorebooks_dir / resolved).resolve()
+        if not path.is_relative_to(base):
+            raise ValueError(f"Invalid lorebook path outside directory: {filename}")
         if not path.exists():
             self._lorebook_cache.pop(resolved, None)
             return []
@@ -571,13 +577,25 @@ class StorageManager:
                     kw, rest = chunk_data.split(b"\x00", 1)
                     if kw.decode("latin-1", errors="ignore").strip().lower() == "chara" and len(rest) >= 1:
                         comp_data = rest[1:]
-                        chara_b64 = zlib.decompress(comp_data).decode("utf-8", errors="ignore").strip()
+                        max_bytes = 5 * 1024 * 1024
+                        dobj = zlib.decompressobj()
+                        raw_bytes = dobj.decompress(comp_data, max_bytes)
+                        if dobj.unconsumed_tail:
+                            raise ValueError("Character metadata exceeds maximum allowed size (5MB).")
+                        chara_b64 = raw_bytes.decode("utf-8", errors="ignore").strip()
                         break
             elif ctype == b"iTXt":
                 parts = chunk_data.split(b"\x00", 5)
                 if len(parts) >= 6 and parts[0].decode("latin-1", errors="ignore").strip().lower() == "chara":
                     comp_flag = parts[1][:1] == b"\x01"
-                    raw_text = zlib.decompress(parts[5]) if comp_flag else parts[5]
+                    if comp_flag:
+                        max_bytes = 5 * 1024 * 1024
+                        dobj = zlib.decompressobj()
+                        raw_text = dobj.decompress(parts[5], max_bytes)
+                        if dobj.unconsumed_tail:
+                            raise ValueError("Character metadata exceeds maximum allowed size (5MB).")
+                    else:
+                        raw_text = parts[5]
                     chara_b64 = raw_text.decode("utf-8", errors="ignore").strip()
                     break
             elif ctype == b"IEND":
