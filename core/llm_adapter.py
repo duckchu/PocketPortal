@@ -33,7 +33,7 @@ class LLMAdapter:
         self.ollama_url = str(bot_config.get("ollama_url", "http://127.0.0.1:11434")).rstrip("/")
         self.ollama_cloud_url = str(bot_config.get("ollama_cloud_url", "https://ollama.com")).rstrip("/")
         self.ollama_api_key = str(bot_config.get("ollama_api_key") or os.environ.get("OLLAMA_API_KEY") or "").strip()
-        self.kobold_bin = str(bot_config.get("koboldcpp_bin", "/path/to/bin/koboldcpp"))
+        self.kobold_bin = str(bot_config.get("koboldcpp_bin") or "").strip()
         self.port = int(bot_config.get("koboldcpp_port", 5001))
         self.mlx_port = int(bot_config.get("mlx_port", 8080))
         self.mlx_url = str(bot_config.get("mlx_url", f"http://127.0.0.1:{self.mlx_port}")).rstrip("/")
@@ -95,7 +95,7 @@ class LLMAdapter:
     def _ollama_endpoint_and_headers(self, model_key: Optional[str] = None) -> tuple[str, dict[str, str]]:
         if self.get_backend(model_key) == "ollama_cloud" and self.ollama_api_key:
             return self.ollama_cloud_url, {"Authorization": f"Bearer {self.ollama_api_key}"}
-        cfg = self.get_model_config(model_key)
+        cfg = self.get_model_info(model_key)
         custom_url = str(cfg.get("ollama_url") or "").strip().rstrip("/")
         return (custom_url or self.ollama_url), {}
 
@@ -175,6 +175,11 @@ class LLMAdapter:
         self._mlx_process = None
 
     def build_cli_args(self, model_key: str) -> list[str]:
+        if not self.kobold_bin or not Path(self.kobold_bin).exists():
+            raise FileNotFoundError(
+                f"KoboldCpp binary not found or not configured: {self.kobold_bin or '(empty)'}. "
+                "Please configure 'koboldcpp_bin' in config/bot_config.yaml to run KoboldCpp GGUF models."
+            )
         cfg = self.get_model_info(model_key)
         kcpps = cfg.get("kcpps_config")
         if kcpps and Path(str(kcpps)).exists():
@@ -264,21 +269,22 @@ class LLMAdapter:
             except Exception:
                 pass
             return None
-        if backend == "ollama":
+        if backend in ("ollama", "ollama_lan"):
             cfg = self.get_model_info()
             ollama_model = str(cfg.get("ollama_model", ""))
+            endpoint, _ = self._ollama_endpoint_and_headers()
             try:
                 async with httpx.AsyncClient(timeout=3.0) as client:
-                    resp = await client.get(f"{self.ollama_url}/api/ps")
+                    resp = await client.get(f"{endpoint}/api/ps")
                     if resp.status_code == 200:
                         running = [m.get("name") for m in resp.json().get("models", [])]
                         if ollama_model in running:
-                            return f"ollama/{ollama_model}"
-                    tags_resp = await client.get(f"{self.ollama_url}/api/tags")
+                            return f"{backend}/{ollama_model}"
+                    tags_resp = await client.get(f"{endpoint}/api/tags")
                     if tags_resp.status_code == 200:
                         available = [m.get("name") for m in tags_resp.json().get("models", [])]
                         if ollama_model in available:
-                            return f"ollama/{ollama_model} (Ready)"
+                            return f"{backend}/{ollama_model} (Ready)"
             except Exception:
                 pass
             return None
@@ -380,33 +386,34 @@ class LLMAdapter:
                 logger.info("Ollama Cloud model ready: %s (%s)", model_key, ollama_model)
                 return f"ollama-cloud/{ollama_model}"
 
-            if backend == "ollama":
+            if backend in ("ollama", "ollama_lan"):
                 cfg = self.get_model_info(model_key)
                 ollama_model = str(cfg.get("ollama_model", "")).strip()
                 if not ollama_model:
                     raise ValueError(f"Missing ollama_model for {model_key}")
-                logger.info("Switching to Ollama model %s; stopping KoboldCpp and other Ollama models", ollama_model)
+                endpoint, headers = self._ollama_endpoint_and_headers(model_key)
+                logger.info("Switching to %s model %s; stopping KoboldCpp and other Ollama models", backend, ollama_model)
                 await self.stop_process()
-                loaded_ollama = await self.get_loaded_ollama_models()
+                loaded_ollama = await self.get_loaded_ollama_models(model_key)
                 ctx_size = int(cfg.get("context_size", 65536))
-                async with httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=self.startup_timeout, write=10.0, pool=10.0)) as client:
+                async with httpx.AsyncClient(timeout=httpx.Timeout(connect=5.0, read=self.startup_timeout, write=10.0, pool=10.0), headers=headers) as client:
                     for other_model in loaded_ollama:
                         if other_model != ollama_model and "embedding" not in other_model.lower():
                             try:
                                 await client.post(
-                                    f"{self.ollama_url}/api/generate",
+                                    f"{endpoint}/api/generate",
                                     json={"model": other_model, "prompt": "", "keep_alive": 0},
                                 )
                             except Exception as exc:
                                 logger.warning("Failed to unload previous Ollama model %s: %s", other_model, exc)
-                    tags_resp = await client.get(f"{self.ollama_url}/api/tags")
+                    tags_resp = await client.get(f"{endpoint}/api/tags")
                     tags_resp.raise_for_status()
                     available = [m.get("name") for m in tags_resp.json().get("models", [])]
                     if ollama_model not in available:
-                        raise RuntimeError(f"Ollama model `{ollama_model}` not found. Check `ollama list`.")
+                        raise RuntimeError(f"Ollama model `{ollama_model}` not found on {endpoint}. Check `ollama list`.")
                     # Warm-load model with target num_ctx to avoid context reallocation on first turn
                     warm_resp = await client.post(
-                        f"{self.ollama_url}/api/generate",
+                        f"{endpoint}/api/generate",
                         json={
                             "model": ollama_model,
                             "prompt": "",
@@ -417,8 +424,8 @@ class LLMAdapter:
                     warm_resp.raise_for_status()
                 self.active_model_key = model_key
                 self.touch_activity()
-                logger.info("Ollama model ready: %s (%s)", model_key, ollama_model)
-                return f"ollama/{ollama_model}"
+                logger.info("%s model ready: %s (%s)", backend, model_key, ollama_model)
+                return f"{backend}/{ollama_model}"
 
             cmd = self.build_cli_args(model_key)
             logger.info("Stopping existing KoboldCpp and Ollama models before loading %s", model_key)
@@ -467,43 +474,45 @@ class LLMAdapter:
 
     async def ensure_running(self) -> str:
         backend = self.get_backend()
-        if backend in ("ollama", "ollama_cloud"):
+        if backend in ("ollama", "ollama_lan", "ollama_cloud"):
             if self._process is not None:
                 await self.stop_process()
             cfg = self.get_model_info()
-            prefix = "ollama-cloud" if backend == "ollama_cloud" else "ollama"
+            prefix = "ollama-cloud" if backend == "ollama_cloud" else backend
             return f"{prefix}/{cfg.get('ollama_model', '')}"
         loaded = await self.get_loaded_model_from_api()
         if loaded:
             return loaded
         return await self.switch_model(self.active_model_key)
 
-    async def get_loaded_ollama_models(self) -> list[str]:
+    async def get_loaded_ollama_models(self, model_key: Optional[str] = None) -> list[str]:
+        endpoint, headers = self._ollama_endpoint_and_headers(model_key)
         try:
-            async with httpx.AsyncClient(timeout=3.0) as client:
-                resp = await client.get(f"{self.ollama_url}/api/ps")
+            async with httpx.AsyncClient(timeout=3.0, headers=headers) as client:
+                resp = await client.get(f"{endpoint}/api/ps")
             if resp.status_code == 200:
                 return [str(m.get("name")) for m in resp.json().get("models", []) if m.get("name")]
         except Exception:
             pass
         return []
 
-    async def unload_ollama_models(self) -> list[str]:
-        running = await self.get_loaded_ollama_models()
+    async def unload_ollama_models(self, model_key: Optional[str] = None) -> list[str]:
+        running = await self.get_loaded_ollama_models(model_key)
         unloaded: list[str] = []
         if not running:
             return unloaded
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        endpoint, headers = self._ollama_endpoint_and_headers(model_key)
+        async with httpx.AsyncClient(timeout=10.0, headers=headers) as client:
             for name in running:
                 try:
                     resp = await client.post(
-                        f"{self.ollama_url}/api/generate",
+                        f"{endpoint}/api/generate",
                         json={"model": name, "prompt": "", "keep_alive": 0},
                     )
                     if resp.status_code == 200:
                         unloaded.append(name)
                 except Exception as exc:
-                    logger.warning("Failed to unload Ollama model %s: %s", name, exc)
+                    logger.warning("Failed to unload Ollama model %s on %s: %s", name, endpoint, exc)
         return unloaded
 
     async def unload_all_models(self) -> dict[str, list[Any]]:

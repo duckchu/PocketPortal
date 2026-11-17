@@ -431,7 +431,7 @@ class BotController:
                     )
 
                 actual_prompt_tokens = assembled.prompt_tokens
-                if self.kobold.get_backend() == "ollama" and self.kobold.last_prompt_eval_count:
+                if self.kobold._is_ollama_backend() and self.kobold.last_prompt_eval_count:
                     actual_prompt_tokens = self.kobold.last_prompt_eval_count
 
                 rt.session.last_triggered_lore = list(assembled.triggered_lore_keys)

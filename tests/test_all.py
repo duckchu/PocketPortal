@@ -26,6 +26,7 @@ def _make_stack(tmp_workspace: Path):
         "allowed_user_ids": [12345],
         "default_user_name": "Player",
         "koboldcpp_url": "http://127.0.0.1:5001",
+        "koboldcpp_bin": str(tmp_workspace / "koboldcpp"),
         "ollama_url": "http://127.0.0.1:11434",
         "mlx_url": "http://127.0.0.1:8080",
         "active_preset": "default",
@@ -119,6 +120,7 @@ def _make_stack(tmp_workspace: Path):
 
 def test_storage_and_cli_args(tmp_path: Path) -> None:
     storage, kobold, _, _ = _make_stack(tmp_path)
+    (tmp_path / "koboldcpp").write_bytes(b"bin")
     (tmp_path / "test.gguf").write_bytes(b"gguf")
     args = kobold.build_cli_args("local-kobold")
     assert "--contextsize" in args and "65536" in args

@@ -3,7 +3,7 @@ allowed_user_ids:
 - 123456789
 # Local inference backends (defaults are fine for a stock install)
 koboldcpp_url: http://127.0.0.1:5001
-koboldcpp_bin: /path/to/bin/koboldcpp
+# koboldcpp_bin: /usr/local/bin/koboldcpp
 koboldcpp_port: 5001
 koboldcpp_startup_timeout: 120
 ollama_url: http://127.0.0.1:11434
