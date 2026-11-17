@@ -22,6 +22,7 @@ from telegram.constants import ParseMode
 from telegram.error import BadRequest, RetryAfter, TelegramError
 from telegram.ext import ContextTypes
 
+from core.audio_adapter import AudioAdapter
 from core.context_engine import AssembledPrompt, ContextEngine
 from core.llm_adapter import LLMAdapter
 from illust.comfy_gen import (
@@ -55,6 +56,8 @@ class ChatRuntime:
     awaiting_arc_theme: bool = False
     pending_arc_char_filename: Optional[str] = None
     pending_arc_data: Optional[dict[str, Any]] = None
+    voice_mode: bool = False
+    coach_mode: bool = False
     id_map: dict[str, str] = field(default_factory=dict)
 
     def register_id(self, prefix: str, full_value: str) -> str:
@@ -79,11 +82,13 @@ class BotController:
         kobold: LLMAdapter,
         engine: ContextEngine,
         bot_config: dict[str, Any],
+        audio: Optional[AudioAdapter] = None,
     ) -> None:
         self.storage = storage
         self.kobold = kobold
         self.engine = engine
         self.bot_config = bot_config
+        self.audio = audio or AudioAdapter(bot_config=bot_config, base_dir=storage.base_dir)
         self.allowed_ids: set[int] = {int(x) for x in (bot_config.get("allowed_user_ids") or [])}
         if not self.allowed_ids:
             logger.warning("allowed_user_ids is empty; all Telegram requests will be denied (fail-closed).")
@@ -156,6 +161,7 @@ class BotController:
             ],
             [
                 InlineKeyboardButton("➕ Continue", callback_data=f"sw:cont:{tid}"),
+                InlineKeyboardButton("🔊 Speak", callback_data=f"sw:tts:{tid}"),
                 InlineKeyboardButton("🎨 Illustrate", callback_data=f"sw:illustrate:{tid}"),
             ],
         ])
@@ -466,6 +472,15 @@ class BotController:
                 if used_tokens >= int(assembled.max_context * 0.85) and len(unsummarized) > 12:
                     asyncio.create_task(self._auto_summarize_background(bot, chat_id, rt))
 
+            if rt.voice_mode and turn is not None and final_text and not final_text.startswith("(The model returned"):
+                await self._perform_tts(
+                    rt=rt,
+                    bot=bot,
+                    chat_id=chat_id,
+                    reply_to_message_id=turn.get_message_ids()[-1] if turn.get_message_ids() else msg_id,
+                    target_turn=turn,
+                )
+
         except Exception as exc:
             logger.exception("Generation failed: %s", exc)
             await self._safe_edit_text(
@@ -522,6 +537,7 @@ class BotController:
         labels = {
             "koboldcpp": "⚡ KoboldCpp (Native Metal)",
             "ollama": "🦙 Ollama (Local API)",
+            "ollama_lan": "🌐 Ollama (LAN)",
             "mlx": "🍎 MLX (Apple Silicon)",
             "ollama_cloud": "☁️ Ollama Cloud",
         }
@@ -540,7 +556,7 @@ class BotController:
         active_info = models.get(active_key or "", {})
         active_fw = str(active_info.get("backend", "")).lower() if active_info else ""
 
-        ordered_fws = [fw for fw in ("koboldcpp", "ollama", "mlx", "ollama_cloud") if fw in grouped]
+        ordered_fws = [fw for fw in ("koboldcpp", "ollama", "ollama_lan", "mlx", "ollama_cloud") if fw in grouped]
         for fw in grouped:
             if fw not in ordered_fws:
                 ordered_fws.append(fw)
@@ -1631,7 +1647,23 @@ class BotController:
             await update.effective_message.reply_text("⚠️ Please select a character first using /char.")
             return
 
+        await self._process_user_text(update, context, rt, raw_text)
+
+    async def _process_user_text(
+        self,
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE,
+        rt: ChatRuntime,
+        raw_text: str,
+    ) -> None:
+        assert rt.session is not None and rt.character is not None
         clean_dialogue, inline_ooc = self.engine.parse_user_input(raw_text)
+        if rt.coach_mode and not inline_ooc:
+            inline_ooc = (
+                "Stay in character and reply naturally in English. "
+                "At the very end on a new line, add one brief '[💡 Speaking Coach: ...]' "
+                "tip correcting grammar or suggesting a more natural phrasing if helpful."
+            )
         if not clean_dialogue and inline_ooc:
             last_turn = rt.session.get_last_turn()
             if last_turn is not None and last_turn.role == "assistant":
@@ -1673,6 +1705,95 @@ class BotController:
             assembled=assembled,
         )
 
+    @staticmethod
+    def _voice_menu(rt: ChatRuntime) -> tuple[str, InlineKeyboardMarkup]:
+        v_icon = "✅" if rt.voice_mode else "⬜"
+        c_icon = "✅" if rt.coach_mode else "⬜"
+        text = (
+            "🎙️ <b>Voice &amp; Speaking Practice Settings</b>\n\n"
+            f"• Auto Voice Reply: <b>{'ON' if rt.voice_mode else 'OFF'}</b>\n"
+            f"• Speaking Coach Tips: <b>{'ON' if rt.coach_mode else 'OFF'}</b>\n\n"
+            "Send a Telegram voice message anytime to transcribe &amp; reply."
+        )
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"{v_icon} Auto Voice Reply", callback_data="voice_ctl:toggle_voice")],
+            [InlineKeyboardButton(f"{c_icon} Speaking Coach (Speak Mode)", callback_data="voice_ctl:toggle_coach")],
+        ])
+        return text, kb
+
+    async def cmd_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not await self._require_auth(update):
+            return
+        rt = self.get_runtime(update.effective_chat.id)
+        args = [a.lower() for a in (context.args or [])]
+        if args:
+            if args[0] == "on":
+                rt.voice_mode = True
+            elif args[0] == "off":
+                rt.voice_mode = False
+            elif args[0] == "coach":
+                rt.coach_mode = not rt.coach_mode
+        text, kb = self._voice_menu(rt)
+        await self._safe_send_html(update.effective_message, text, reply_markup=kb, already_html=True)
+
+    async def handle_voice(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        if not await self._require_auth(update):
+            return
+        msg = update.effective_message
+        if not msg:
+            return
+        media = msg.voice or msg.audio
+        if not media:
+            return
+        if media.file_size and media.file_size > 15 * 1024 * 1024:
+            await msg.reply_text("❌ Voice message exceeds the 15MB size limit.")
+            return
+
+        rt = self.get_runtime(update.effective_chat.id)
+        if not rt.session or not rt.character:
+            await msg.reply_text("⚠️ Please select a character first using /char.")
+            return
+
+        status_msg = await msg.reply_text("🎙️ Transcribing voice...")
+        try:
+            tg_file = await media.get_file()
+            raw_bytes = bytes(await tg_file.download_as_bytearray())
+            transcript = await self.audio.transcribe_ogg(raw_bytes)
+            if not transcript:
+                await status_msg.edit_text("⚠️ Could not recognize any speech in the voice message.")
+                return
+            await self._safe_edit_text(
+                context.bot,
+                update.effective_chat.id,
+                status_msg.message_id,
+                f"🎙️ <b>You said:</b> <i>{_esc(transcript)}</i>",
+                already_html=True,
+            )
+            await self._process_user_text(update, context, rt, transcript)
+        except Exception as exc:
+            logger.exception("Voice transcription failed: %s", exc)
+            await status_msg.edit_text(f"❌ Voice transcription failed: {exc}")
+
+    async def _perform_tts(
+        self,
+        rt: ChatRuntime,
+        bot: Any,
+        chat_id: int,
+        target_turn: Turn,
+        reply_to_message_id: Optional[int] = None,
+    ) -> None:
+        char_name = rt.character.name if rt.character else ""
+        try:
+            ogg_bytes = await self.audio.synthesize_ogg(target_turn.text, char_name=char_name)
+            await bot.send_voice(
+                chat_id=chat_id,
+                voice=ogg_bytes,
+                reply_to_message_id=reply_to_message_id,
+            )
+        except Exception as exc:
+            logger.exception("TTS synthesis failed: %s", exc)
+            await bot.send_message(chat_id=chat_id, text=f"❌ TTS synthesis failed: {exc}")
+
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         if not await self._require_auth(update):
             return
@@ -1700,6 +1821,18 @@ class BotController:
                 self.storage.save_session(rt.session)
             summary = await self.kobold.unload_all_models()
             await query.edit_message_text(self._format_unload_summary(summary))
+            return
+
+        if data.startswith("voice_ctl:"):
+            sub = data.split(":", 1)[1]
+            if sub == "toggle_voice":
+                rt.voice_mode = not rt.voice_mode
+            elif sub == "toggle_coach":
+                rt.coach_mode = not rt.coach_mode
+            text, kb = self._voice_menu(rt)
+            await self._safe_edit_text(
+                context.bot, chat_id, query.message.message_id, text, reply_markup=kb, already_html=True
+            )
             return
 
         if data == "mdl_fw_back":
@@ -2208,6 +2341,14 @@ class BotController:
                     chat_id=chat_id,
                     fallback_message=query.message,
                     target_turn=target_turn,
+                )
+            elif action == "tts":
+                await self._perform_tts(
+                    rt=rt,
+                    bot=context.bot,
+                    chat_id=chat_id,
+                    target_turn=target_turn,
+                    reply_to_message_id=query.message.message_id,
                 )
             elif action == "illustrate":
                 await self._perform_illustrate(

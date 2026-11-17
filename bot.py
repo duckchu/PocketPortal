@@ -57,6 +57,7 @@ async def post_init(application: Application) -> None:
         BotCommand("load", "Load saved session or checkpoint"),
         BotCommand("summarize", "Summarize oldest turns into story summary"),
         BotCommand("illustrate", "Generate scene illustration via ComfyUI"),
+        BotCommand("voice", "Toggle auto voice reply and speaking coach"),
         BotCommand("exit", "Save progress and unload model memory"),
         BotCommand("status", "Show system, token budget, and prompt status"),
     ]
@@ -124,11 +125,13 @@ def build_application() -> Application:
     app.add_handler(CommandHandler("load", controller.cmd_load))
     app.add_handler(CommandHandler("summarize", controller.cmd_summarize))
     app.add_handler(CommandHandler("illustrate", controller.cmd_illustrate))
+    app.add_handler(CommandHandler("voice", controller.cmd_voice))
     app.add_handler(CommandHandler(["exit", "unload"], controller.cmd_exit))
     app.add_handler(CommandHandler("status", controller.cmd_status))
 
     app.add_handler(CallbackQueryHandler(controller.handle_callback))
     app.add_handler(MessageHandler(filters.Document.IMAGE, controller.handle_document))
+    app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO, controller.handle_voice))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), controller.handle_text))
 
     return app

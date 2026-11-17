@@ -48,3 +48,6 @@ illust/personas/*.yml
 # Local persona/prompt overrides
 config/*.local.yaml
 i18n/*.local.json
+
+# Local audio models (STT/TTS)
+audio_models/

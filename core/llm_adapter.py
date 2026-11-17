@@ -90,12 +90,14 @@ class LLMAdapter:
         return "koboldcpp"
 
     def _is_ollama_backend(self, model_key: Optional[str] = None) -> bool:
-        return self.get_backend(model_key) in ("ollama", "ollama_cloud")
+        return self.get_backend(model_key) in ("ollama", "ollama_lan", "ollama_cloud")
 
     def _ollama_endpoint_and_headers(self, model_key: Optional[str] = None) -> tuple[str, dict[str, str]]:
         if self.get_backend(model_key) == "ollama_cloud" and self.ollama_api_key:
             return self.ollama_cloud_url, {"Authorization": f"Bearer {self.ollama_api_key}"}
-        return self.ollama_url, {}
+        cfg = self.get_model_config(model_key)
+        custom_url = str(cfg.get("ollama_url") or "").strip().rstrip("/")
+        return (custom_url or self.ollama_url), {}
 
     # ------------------------------------------------------------------
     # Process / Model Manager Wrapper

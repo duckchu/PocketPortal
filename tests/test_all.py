@@ -200,3 +200,32 @@ def test_two_level_model_menu(tmp_path: Path) -> None:
     _, oc_markup = ctrl._build_model_list_menu(rt, "ollama_cloud", live_model=None)
     oc_labels = [btn.text for row in oc_markup.inline_keyboard for btn in row]
     assert any("Cloud" in lbl for lbl in oc_labels)
+
+
+@pytest.mark.asyncio
+async def test_audio_adapter_roundtrip() -> None:
+    from core.audio_adapter import AudioAdapter
+
+    base_dir = Path(__file__).resolve().parent.parent
+    adapter = AudioAdapter(bot_config={}, base_dir=base_dir)
+    cleaned = adapter.clean_text_for_speech("<think>secret</think> *smiles* \"Hello there!\"\n[💡 Speaking Coach: nice!]")
+    assert "secret" not in cleaned
+    assert "Speaking Coach" not in cleaned
+    assert "Hello there!" in cleaned
+
+    sample = "Good evening, traveler. The stars above Neverland are brilliant tonight."
+    ogg_bytes = await adapter.synthesize_ogg(sample, char_name="Peter Pan")
+    assert ogg_bytes.startswith(b"OggS")
+    transcript = await adapter.transcribe_ogg(ogg_bytes)
+    assert "neverland" in transcript.lower()
+    assert "brilliant" in transcript.lower()
+
+    # Test dual voice segmentation
+    dual_sample = '*She walks forward.* "Can you hear me?" *She smiles.*'
+    segments = adapter.segment_speech_elements(dual_sample)
+    assert len(segments) == 3
+    assert segments[0] == ("narration", "She walks forward.")
+    assert segments[1] == ("dialogue", "Can you hear me?")
+    assert segments[2] == ("narration", "She smiles.")
+    dual_ogg = await adapter.synthesize_ogg(dual_sample, char_name="Snow White")
+    assert dual_ogg.startswith(b"OggS")

@@ -24,3 +24,7 @@ default_user_persona: '{{user}} is a calm, observant adventurer exploring the wo
 stream_interval_sec: 1.6
 idle_unload_enabled: true
 idle_unload_seconds: 300
+stt_model: base.en
+stt_cpu_threads: 4
+tts_default_voice: en_GB-alan-medium
+tts_female_voice: en_GB-cori-medium

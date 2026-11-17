@@ -69,7 +69,23 @@ Unlike Telegram bridge plugins that require running the full Node.js SillyTavern
 | `/summarize` | Compress oldest turns into a Story Summary |
 | `/illustrate` | Generate a scene illustration via ComfyUI |
 | `/save` / `/load` | Create checkpoint & export clean Markdown novel, or load saved sessions |
+| `/voice` | Voice Interaction & Speaking Coach dashboard (toggle Auto-Voice / Coach Mode) |
 | `/status` / `/exit` | View token budget & prompt dashboard, or save & unload model memory |
+
+---
+
+## Voice Interaction & Dual-Voice Narration (STT & TTS)
+
+PocketPortal features a completely local, CPU-based speech engine powered by **faster-whisper** (STT) and **piper-tts** (TTS), maintaining a strict boundary that prevents CMA/VRAM resource contention on edge hardware (such as RK3588 or Apple Silicon):
+
+- **🎙️ Direct Voice Input (STT)**: Send Telegram voice notes or audio messages directly. PocketPortal transcribes them on the CPU via `faster-whisper` and streams your speech into the roleplay session naturally.
+- **🔊 Multi-Voice & Dual-Voice Narration (TTS)**:
+  - Both character spoken dialogue and world narration/exposition are read aloud.
+  - **Narrator & Dialogue Voice Separation**: Spoken dialogue (e.g. `"..."` or `“...”`) is synthesized using the designated character voice (with automatic male/female British voice selection), while narration, scene descriptions, and stage directions are voiced by a distinct British narrator voice (`en_GB-alba-medium` / `en_GB-alan-medium`).
+  - Listen on-demand via the inline **`🔊 Speak`** button beneath any message, or enable automatic voice replies via `/voice`.
+- **🗣️ Speaking Coach Mode (`/voice`)**:
+  - Practice spoken English conversation interactively with your characters.
+  - When enabled, characters respond naturally in-character, followed by an unobtrusive `[💡 Speaking Coach: ...]` tip analyzing grammar, word choice, or phrasing nuances. Coach notes are excluded from voice output to preserve dramatic immersion.
 
 ---
 
