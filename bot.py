@@ -105,7 +105,7 @@ def build_application() -> Application:
     app.bot_data["controller"] = controller
 
     app.add_handler(CommandHandler(["start", "help"], controller.cmd_start))
-    app.add_handler(CommandHandler("model", controller.cmd_model))
+    app.add_handler(CommandHandler(["models", "model"], controller.cmd_model))
     app.add_handler(CommandHandler("char", controller.cmd_char))
     app.add_handler(CommandHandler("world", controller.cmd_world))
     app.add_handler(CommandHandler("world_add", controller.cmd_world_add))
