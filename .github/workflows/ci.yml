@@ -1,0 +1,48 @@
+name: PocketPortal CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Run Unit Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+
+    - name: Install system dependencies (ffmpeg)
+      run: |
+        sudo apt-get update && sudo apt-get install -y ffmpeg
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt "av<14"
+
+    - name: Prepare mock environment
+      run: |
+        cp -n config/bot_config.example.yaml config/bot_config.yaml || true
+        cp -n config/models.example.yaml config/models.yaml || true
+        cp -n config/system_presets.example.yaml config/system_presets.yaml || true
+        mkdir -p sessions logs exports characters lorebooks audio_models/piper audio_models/whisper
+
+    - name: Run unit tests with pytest
+      run: |
+        pytest -v --tb=short
