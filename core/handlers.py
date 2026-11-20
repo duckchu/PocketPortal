@@ -1783,8 +1783,13 @@ class BotController:
         reply_to_message_id: Optional[int] = None,
     ) -> None:
         char_name = rt.character.name if rt.character else ""
+        char_voice = ""
+        if rt.character:
+            raw = getattr(rt.character, "raw_data", None) or {}
+            ext = raw.get("extensions") if isinstance(raw.get("extensions"), dict) else {}
+            char_voice = str(raw.get("tts_voice") or ext.get("tts_voice") or "").strip()
         try:
-            ogg_bytes = await self.audio.synthesize_ogg(target_turn.text, char_name=char_name)
+            ogg_bytes = await self.audio.synthesize_ogg(target_turn.text, char_name=char_name, char_voice=char_voice)
             await bot.send_voice(
                 chat_id=chat_id,
                 voice=ogg_bytes,

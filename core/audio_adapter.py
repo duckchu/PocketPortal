@@ -166,7 +166,7 @@ class AudioAdapter:
             return self.tts_narrator_voice
         return self.tts_default_voice
 
-    def _synthesize_ogg_sync(self, text: str, char_name: str = "") -> bytes:
+    def _synthesize_ogg_sync(self, text: str, char_name: str = "", char_voice: str = "") -> bytes:
         segments = self.segment_speech_elements(text)
         if not segments:
             raise ValueError("No speakable text available after cleaning.")
@@ -201,12 +201,28 @@ class AudioAdapter:
             seg_buf.seek(0)
             with wave.open(seg_buf, "rb") as seg_wav:
                 params = seg_wav.getparams()
+                raw_frames = seg_wav.readframes(seg_wav.getnframes())
                 if target_params is None:
                     target_params = params
-                    pause_frames = int(params.framerate * params.nchannels * params.sampwidth * 0.25)
-                elif combined_frames and pause_frames > 0:
-                    combined_frames.extend(b"\x00" * pause_frames)
-                combined_frames.extend(seg_wav.readframes(seg_wav.getnframes()))
+                    frame_bytes = params.nchannels * params.sampwidth
+                    pause_frames = int(params.framerate * 0.25) * frame_bytes
+                else:
+                    if combined_frames and pause_frames > 0:
+                        combined_frames.extend(bytes(pause_frames))
+                    if params.framerate != target_params.framerate or params.nchannels != target_params.nchannels:
+                        rs = subprocess.run(
+                            [
+                                "ffmpeg", "-y", "-f", "wav", "-i", "pipe:0",
+                                "-ar", str(target_params.framerate),
+                                "-ac", str(target_params.nchannels),
+                                "-f", "s16le", "pipe:1",
+                            ],
+                            input=seg_buf.getvalue(),
+                            capture_output=True,
+                            check=True,
+                        )
+                        raw_frames = rs.stdout
+                combined_frames.extend(raw_frames)
 
         if not combined_frames or target_params is None:
             raise ValueError("Failed to synthesize speech audio frames.")
@@ -244,6 +260,6 @@ class AudioAdapter:
         )
         return proc.stdout
 
-    async def synthesize_ogg(self, text: str, char_name: str = "") -> bytes:
+    async def synthesize_ogg(self, text: str, char_name: str = "", char_voice: str = "") -> bytes:
         """Synthesize text to Telegram-native OGG Opus voice bytes on CPU."""
-        return await asyncio.to_thread(self._synthesize_ogg_sync, text, char_name)
+        return await asyncio.to_thread(self._synthesize_ogg_sync, text, char_name, char_voice)
