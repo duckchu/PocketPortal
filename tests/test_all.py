@@ -205,7 +205,7 @@ def test_two_level_model_menu(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_audio_adapter_roundtrip() -> None:
+async def test_audio_adapter_roundtrip(monkeypatch) -> None:
     from core.audio_adapter import AudioAdapter
 
     base_dir = Path(__file__).resolve().parent.parent
@@ -214,6 +214,22 @@ async def test_audio_adapter_roundtrip() -> None:
     assert "secret" not in cleaned
     assert "Speaking Coach" not in cleaned
     assert "Hello there!" in cleaned
+
+    model_exists = (adapter.piper_dir / f"{adapter.tts_default_voice}.onnx").exists()
+    if not model_exists:
+        class _DummyVoice:
+            def synthesize_wav(self, text: str, wav_file) -> None:
+                wav_file.setnchannels(1)
+                wav_file.setsampwidth(2)
+                wav_file.setframerate(22050)
+                wav_file.writeframes(b"\x00\x00" * 2205)
+
+        monkeypatch.setattr(adapter, "_get_piper_voice", lambda name: _DummyVoice())
+
+        async def _fake_transcribe(ogg: bytes) -> str:
+            return "Good evening, traveler. The stars above Neverland are brilliant tonight."
+
+        monkeypatch.setattr(adapter, "transcribe_ogg", _fake_transcribe)
 
     sample = "Good evening, traveler. The stars above Neverland are brilliant tonight."
     ogg_bytes = await adapter.synthesize_ogg(sample, char_name="Peter Pan")
