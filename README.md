@@ -135,6 +135,26 @@ To use [rkllama](https://github.com/NotPunchnox/rkllama) on Rockchip RK3588/RK35
    ```
 2. Add your `.rkllm` models in `config/models.yaml` with `backend: ollama` and set `context_size: 4096` (or match your `.rkllm` model's `max_context_limit`). See `rkllama-example` in `config/models.example.yaml`.
 
+## Voice Support (STT & TTS)
+
+PocketPortal supports local CPU speech-to-text (`faster-whisper`) and text-to-speech (`piper-tts`) via `ffmpeg` and OGG/Opus.
+
+### Installation
+
+1. Install **Python 3.12** and **ffmpeg** (`onnxruntime` requires Python <= 3.12):
+   ```bash
+   brew install python@3.12 ffmpeg
+   ```
+2. Install voice dependencies (pin `av<14` for `faster-whisper` compatibility):
+   ```bash
+   pip install faster-whisper piper-tts "av<14"
+   ```
+3. Download Piper voice models (`.onnx` & `.onnx.json`) from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices) into `audio_models/piper/`.
+4. Optionally specify a character voice in its YAML/JSON card via `tts_voice`:
+   ```yaml
+   tts_voice: en_GB-cori-medium
+   ```
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
